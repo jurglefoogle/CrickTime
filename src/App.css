@@ -39,45 +39,49 @@ body {
   line-height: 1.5;
 }
 
-/* Layout */
-.app-container {
+/* Layout (updated & compact) */
+.app { /* matches App.js */
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  padding: 0 15px; /* left/right padding for entire app */
 }
 
-.app-header {
-  padding: 0.75rem 1rem 0.5rem;
+.header { /* previously app-header */
+  padding: 10px 0 6px;
   text-align: center;
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.app-title {
-  font-size: 1.5rem;
-  font-weight: 700;
+.header-title { /* previously app-title */
+  font-size: 1.35rem;
+  font-weight: 650;
   color: var(--text-primary);
-  margin-bottom: 0.125rem;
+  margin-bottom: 2px;
+  letter-spacing: 0.5px;
 }
 
-.app-subtitle {
-  font-size: 0.8rem;
+.header-subtitle { /* previously app-subtitle */
+  font-size: 0.7rem;
   color: var(--text-secondary);
   font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
-.app-main {
+.main-content { /* previously app-main */
   flex: 1;
-  padding: 15px;
-  padding-bottom: 4.5rem; /* Space for nav */
+  padding-top: 10px;
+  padding-bottom: 70px; /* space for nav */
   max-width: 480px;
   margin: 0 auto;
   width: 100%;
 }
 
-.tab-content {
+.tab-content { /* vertical stack between Cards */
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 8px; /* further compact */
 }
 
 /* Cards & Panels */
@@ -86,18 +90,18 @@ body {
   border-radius: 8px;
   box-shadow: var(--shadow-soft);
   overflow: hidden;
-  margin-bottom: 15px;
+  /* Removed margin-bottom; spacing now handled by parent gap */
 }
 
 .card-content {
-  padding: 15px;
+  padding: 10px; /* more compact */
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 6px; /* tighter */
 }
 
 .card-title {
@@ -110,12 +114,12 @@ body {
 .separator {
   height: 1px;
   background-color: var(--border-subtle);
-  margin: 15px 0;
+  margin: 12px 0; /* reduced */
 }
 
 .section-divider {
-  margin: 15px 0;
-  padding-top: 15px;
+  margin: 12px 0;
+  padding-top: 12px;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -239,13 +243,9 @@ body {
 }
 
 /* Form Elements */
-.form-group {
-  margin-bottom: 15px;
-}
+.form-group { margin-bottom: 10px; }
 
-.input-group {
-  margin-bottom: 15px;
-}
+.input-group { margin-bottom: 10px; }
 
 .input-label {
   display: block;
@@ -343,41 +343,19 @@ body {
   cursor: not-allowed;
 }
 
-/* Activity Items */
-.activity-item {
-  padding: 15px;
-  background-color: var(--bg-primary);
-  border-radius: 6px;
-  border-left: 3px solid var(--accent-blue);
-  margin-bottom: 15px;
-}
-
-.activity-item:last-child {
-  margin-bottom: 0;
-}
-
-.activity-title {
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 0.125rem;
-}
-
-.activity-meta {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
+/* (Removed initial activity-item block; consolidated definition below) */
 
 /* Stats Grid */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 15px;
-  margin-bottom: 15px;
+  gap: 8px; /* tighter */
+  margin-bottom: 6px; /* tighter */
 }
 
 .stat-item {
   text-align: center;
-  padding: 15px;
+  padding: 8px; /* tighter */
   background-color: var(--bg-primary);
   border-radius: 6px;
 }
@@ -400,10 +378,11 @@ body {
 .actions-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 15px;
+  gap: 8px; /* tighter */
 }
 
 /* Navigation Bar */
+/* Single nav-bar definition (deduplicated) */
 .nav-bar {
   position: fixed;
   bottom: 0;
@@ -411,8 +390,9 @@ body {
   right: 0;
   background-color: var(--bg-secondary);
   border-top: 1px solid var(--border-subtle);
-  padding: 0.5rem 0;
+  padding: 6px 0; /* slightly tighter */
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 100;
 }
 
 .nav-content {
@@ -458,13 +438,7 @@ body {
 }
 
 /* Timer Display */
-.timer-display {
-  text-align: center;
-  padding: 15px;
-  background-color: var(--bg-secondary);
-  border-radius: 12px;
-  margin-bottom: 15px;
-}
+/* Removed earlier duplicate timer-display block in favor of detailed version below */
 
 .timer-time {
   font-size: 2.5rem;
@@ -480,14 +454,14 @@ body {
 }
 
 .timer-display {
-  font-size: 2.5rem;
+  font-size: 2.25rem; /* slightly smaller */
   font-weight: 300;
   color: var(--accent-blue);
   font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
-  margin-bottom: 15px;
-  padding: 15px;
+  margin-bottom: 12px;
+  padding: 12px;
   background-color: var(--bg-tertiary);
-  border-radius: 12px;
+  border-radius: 10px;
   border: 2px solid var(--border-subtle);
   transition: all 0.3s ease;
 }
@@ -500,25 +474,23 @@ body {
 
 .timer-start-time {
   color: var(--text-secondary);
-  font-size: 0.85rem;
-  margin-bottom: 15px;
+  font-size: 0.8rem;
+  margin-bottom: 10px;
 }
 
-.timer-controls {
-  margin-top: 15px;
-}
+.timer-controls { margin-top: 10px; }
 
 /* Activity List Styles */
 .activity-list {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 8px; /* tighter */
 }
 
 .activity-item {
-  padding: 15px;
+  padding: 10px;
   background-color: var(--bg-tertiary);
-  border-radius: 8px;
+  border-radius: 6px;
   border-left: 3px solid var(--accent-blue);
 }
 
@@ -582,12 +554,12 @@ body {
 /* Individual Job Cards - Teams-like interface */
 .individual-job-card {
   background-color: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 15px;
+  border-radius: 6px;
+  padding: 10px; /* tighter */
   border-left: 4px solid var(--accent-blue);
   box-shadow: var(--shadow-soft);
   transition: all 0.2s ease;
-  margin-bottom: 15px;
+  margin-bottom: 8px; /* tighter */
 }
 
 .individual-job-card:hover {
@@ -597,7 +569,7 @@ body {
 
 /* Home page schedule container with scrolling */
 .home-schedule-container {
-  max-height: 250px; /* 75% of typical container height */
+  max-height: 230px; /* slightly shorter */
   overflow-y: auto;
   padding-right: 0.25rem; /* Space for scrollbar */
   margin-right: -0.25rem; /* Compensate for padding */
@@ -623,8 +595,8 @@ body {
 
 /* Home page job cards - slightly more compact */
 .home-job-card {
-  margin-bottom: 15px;
-  padding: 15px;
+  margin-bottom: 8px;
+  padding: 10px;
 }
 
 .home-job-card:last-child {
@@ -635,7 +607,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 1rem;
+  gap: 0.75rem; /* reduced */
 }
 
 .job-main-info {
@@ -709,67 +681,22 @@ body {
 
 /* Compact job cards for mobile */
 @media (max-width: 480px) {
-  .individual-job-card {
-    padding: 12px;
-  }
-  
-  .home-job-card {
-    padding: 12px;
-  }
-  
-  .home-schedule-container {
-    max-height: 200px;
-  }
-  
-  .job-card-content {
-    flex-direction: column;
-    gap: 15px;
-  }
-  
-  .job-actions {
-    flex-direction: row;
-    align-self: flex-end;
-  }
-  
-  .job-title {
-    font-size: 0.9rem;
-  }
+  .individual-job-card { padding: 9px; }
+  .home-job-card { padding: 9px; }
+  .home-schedule-container { max-height: 185px; }
+  .job-card-content { flex-direction: column; gap: 8px; }
+  .job-actions { flex-direction: row; align-self: flex-end; }
+  .job-title { font-size: 0.86rem; }
 }
 
 /* Responsive Design */
 @media (max-width: 480px) {
-  .app-main {
-    padding: 15px;
-  }
-  
-  .stats-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-  }
-  
-  .timer-time {
-    font-size: 2rem;
-  }
-  
-  .individual-job-card {
-    padding: 12px;
-  }
-  
-  .home-job-card {
-    padding: 12px;
-  }
-  
-  .card-content {
-    padding: 12px;
-  }
-  
-  .activity-item {
-    padding: 12px;
-  }
-  
-  .stat-item {
-    padding: 12px;
-  }
+  .main-content { padding-top: 6px; }
+  .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .timer-time { font-size: 2rem; }
+  .card-content { padding: 8px; }
+  .activity-item { padding: 8px; }
+  .stat-item { padding: 8px; }
 }
 
 /* Utility Classes */
@@ -805,17 +732,7 @@ body {
 
 .shadow { box-shadow: var(--shadow-soft); }
 
-/* Navigation Styles */
-.nav-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background-color: var(--bg-secondary);
-  border-top: 1px solid var(--border-subtle);
-  padding: 0.5rem 0;
-  z-index: 100;
-}
+/* Navigation Styles (already defined above – keep only modifiers here) */
 
 .nav-container {
   display: flex;
