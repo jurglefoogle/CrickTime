@@ -12,13 +12,20 @@ const Navigation = ({ tabs, activeTab, onTabChange }) => {
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`nav-tab ${
-              activeTab === tab.id ? 'nav-tab-active' : ''
-            }`}
+            className={`nav-tab ${activeTab === tab.id ? 'nav-tab-active' : ''}`}
             aria-label={tab.label}
           >
             <div className="nav-tab-content">
-              <span className="nav-tab-icon">{tab.icon}</span>
+              {tab.img ? (
+                <img
+                  src={tab.img}
+                  alt={tab.label}
+                  className="nav-tab-icon-img"
+                  draggable="false"
+                />
+              ) : (
+                <span className="nav-tab-icon">{tab.icon}</span>
+              )}
               <span className="nav-tab-label">{tab.label}</span>
             </div>
           </button>

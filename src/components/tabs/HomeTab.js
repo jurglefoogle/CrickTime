@@ -67,19 +67,19 @@ const HomeTab = ({ appData, updateAppData, onNavigate }) => {
       <Card>
         <h2 className="page-title">Dashboard</h2>
         <div className="stats-grid">
-          <div className="stat-item">
+          <div className="stat-item stat-click" onClick={() => onNavigate('schedule')} title="Go to schedule">
             <div className="stat-value stat-value-primary">
               {thisWeekScheduled.length}
             </div>
             <div className="stat-label">This Week</div>
           </div>
-          <div className="stat-item">
+          <div className="stat-item stat-click" onClick={() => onNavigate('entries')} title="View recent entries">
             <div className="stat-value stat-value-secondary">
               {recentEntries.length}
             </div>
             <div className="stat-label">Recent Jobs</div>
           </div>
-          <div className="stat-item">
+          <div className="stat-item stat-click" onClick={() => onNavigate('invoice')} title="Create invoice for outstanding">
             <div className="stat-value stat-value-success">
               {dataService.formatCurrency(outstandingAmount)}
             </div>
@@ -213,50 +213,7 @@ const HomeTab = ({ appData, updateAppData, onNavigate }) => {
         )}
       </Card>
 
-      {/* Outstanding Invoices */}
-      {outstandingAmount > 0 && (
-        <Card>
-          <div className="card-header-horizontal">
-            <div>
-              <h3 className="card-title">Outstanding Work</h3>
-              <p className="card-subtitle">
-                {outstandingEntries.length} completed jobs not yet invoiced
-              </p>
-            </div>
-            <div className="outstanding-amount">
-              <div className="outstanding-total">
-                {dataService.formatCurrency(outstandingAmount)}
-              </div>
-              <Button 
-                variant="secondary" 
-                size="small"
-                onClick={() => onNavigate('invoice')}
-              >
-                Create Invoice
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Quick Actions */}
-      <Card>
-        <h3 className="card-title">Quick Actions</h3>
-        <div className="quick-actions">
-          <Button onClick={() => onNavigate('timer')}>
-            ⏱️ Start Timer
-          </Button>
-          <Button onClick={() => onNavigate('schedule')} variant="secondary">
-            📅 Schedule Job
-          </Button>
-          <Button onClick={() => onNavigate('clients')} variant="secondary">
-            👥 Add Client
-          </Button>
-          <Button onClick={() => onNavigate('invoice')} variant="secondary">
-            📄 Create Invoice
-          </Button>
-        </div>
-      </Card>
+  {/* Removed Outstanding Work & Quick Actions per requirements */}
     </div>
   );
 };

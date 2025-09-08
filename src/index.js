@@ -6,38 +6,44 @@ import App from './App';
 // Register service worker for PWA functionality
 // Reference: www.context7.com for PWA best practices
 if ('serviceWorker' in navigator) {
+  // Capture deferred install prompt
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    window._showInstallPrompt = async () => {
+      if (!deferredPrompt) return false;
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      return choice.outcome === 'accepted';
+    };
+    console.log('PWA: beforeinstallprompt captured');
+  });
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+    const basePath = window.location.pathname.includes('/CrickTime/') ? '/CrickTime' : '';
+    navigator.serviceWorker.register(`${basePath}/sw.js`)
       .then((registration) => {
-        console.log('SW registered: ', registration);
-        
-        // Check for updates every time the app loads
+        console.log('SW registered:', registration.scope);
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // New content is available, refresh the page
-                console.log('SW: New content available, refreshing...');
-                window.location.reload();
+                console.log('SW: New version available (will activate on next load)');
               }
             });
           }
         });
-        
-        // Check for updates immediately
-        registration.update();
       })
-      .catch((registrationError) => {
-        console.log('SW registration failed: ', registrationError);
-      });
+      .catch(err => console.log('SW registration failed:', err));
   });
   
   // Listen for messages from service worker
   navigator.serviceWorker.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SW_UPDATED') {
-      console.log('SW: Service worker updated, refreshing...');
-      window.location.reload();
+  console.log('SW: Update message received');
     } else if (event.data && event.data.type === 'CACHE_CLEARED') {
       console.log('SW: Cache cleared successfully');
     }
@@ -51,6 +57,46 @@ if ('serviceWorker' in navigator) {
     } else {
       console.log('SW: No service worker controller available');
     }
+  };
+
+  // Local backup/export utilities
+  window.exportLocalData = () => {
+    try {
+      const raw = localStorage.getItem('appData');
+      if (!raw) {
+        alert('No data to export');
+        return;
+      }
+      const blob = new Blob([raw], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const ts = new Date().toISOString().slice(0,10);
+      a.download = `cricktime-backup-${ts}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Export failed', e);
+      alert('Export failed');
+    }
+  };
+
+  window.importLocalData = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const parsed = JSON.parse(e.target.result);
+        if (!parsed || typeof parsed !== 'object') throw new Error('Invalid');
+        localStorage.setItem('appData', JSON.stringify(parsed));
+        alert('Data imported. Reloading...');
+        window.location.reload();
+      } catch (err) {
+        console.error('Import failed', err);
+        alert('Invalid backup file');
+      }
+    };
+    reader.readAsText(file);
   };
 }
 

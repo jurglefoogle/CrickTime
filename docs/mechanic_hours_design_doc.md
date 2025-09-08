@@ -155,6 +155,41 @@ and mobile accessibility.
 
 ------------------------------------------------------------------------
 
+## PWA & Local Backup Implementation (Added Sept 2025)
+
+The application now supports installability as a Progressive Web App and manual
+local backup/import of data.
+
+### PWA
+
+- `manifest.json` updated with 192x192 & 512x512 maskable icons.
+- `beforeinstallprompt` captured; call `window._showInstallPrompt()` from a UI button
+    (future enhancement) to trigger install.
+- Service worker uses a network-first strategy with dynamic cache version.
+
+### Local Data Export / Import
+
+Global helper functions exposed in `index.js`:
+
+- `window.exportLocalData()` → Downloads `cricktime-backup-YYYY-MM-DD.json` containing the
+    serialized `appData` localStorage blob.
+- `window.importLocalData(file)` → Restores from a user-selected JSON backup file and reloads.
+
+Usage example (in DevTools console):
+
+```js
+exportLocalData(); // triggers download
+// To import: create an <input type="file" onchange="importLocalData(this.files[0])" /> in DOM or call manually.
+```
+
+### Next Steps
+
+- Add an in-app Settings screen with buttons: Install App, Export Backup, Import Backup.
+- Provide visual feedback when a newer service worker version is available (toast instead of auto reload).
+- Optional offline fallback page route if navigation fails.
+
+------------------------------------------------------------------------
+
 ## Success Criteria
 
 -   A mechanic can:

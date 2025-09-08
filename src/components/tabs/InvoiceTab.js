@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -13,7 +13,9 @@ const InvoiceTab = ({ appData, updateAppData }) => {
   const [selectedClient, setSelectedClient] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [invoiceData, setInvoiceData] = useState(null);
+  const [invoiceData, setInvoiceData] = useState(null); // holds draft or finalized invoice meta & all candidate line items
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [finalized, setFinalized] = useState(false);
 
   // Get client options
   const clientOptions = appData.clients.map(client => ({
@@ -21,7 +23,7 @@ const InvoiceTab = ({ appData, updateAppData }) => {
     label: client.name
   }));
 
-  // Generate invoice data
+  // Generate draft invoice data (does NOT mark entries invoiced yet)
   const generateInvoice = () => {
     if (!selectedClient || !startDate || !endDate) {
       alert('Please select a client and date range');
@@ -46,6 +48,7 @@ const InvoiceTab = ({ appData, updateAppData }) => {
     // Get entries for the client and date range
     const clientEntries = appData.entries.filter(entry => {
       if (!entry.end || entry.clientId !== selectedClient) return false;
+      if (entry.invoiced) return false; // skip already invoiced
       
       const entryDate = new Date(entry.start);
       return entryDate >= start && entryDate <= end;
@@ -56,8 +59,8 @@ const InvoiceTab = ({ appData, updateAppData }) => {
       return;
     }
 
-    // Create invoice data
-    const lineItems = clientEntries.map(entry => {
+  // Create candidate line items (all initially selected)
+  const lineItems = clientEntries.map(entry => {
       const taskName = entry.taskName || 'Unknown Task';
       const duration = entry.end - entry.start;
       const hours = dataService.durationToHours(duration);
@@ -74,9 +77,6 @@ const InvoiceTab = ({ appData, updateAppData }) => {
       };
     });
 
-    const totalHours = lineItems.reduce((sum, item) => sum + item.hours, 0);
-    const totalAmount = lineItems.reduce((sum, item) => sum + item.amount, 0);
-
     const invoice = {
       client,
       dateRange: {
@@ -84,15 +84,59 @@ const InvoiceTab = ({ appData, updateAppData }) => {
         end: dataService.formatDate(end)
       },
       lineItems,
-      totals: {
-        hours: totalHours,
-        amount: totalAmount
-      },
       generatedDate: dataService.formatDate(new Date()),
       invoiceNumber: `INV-${Date.now()}`
     };
 
     setInvoiceData(invoice);
+    setSelectedIds(new Set(lineItems.map(li => li.id)));
+    setFinalized(false);
+  };
+
+  // Toggle selection of a line item
+  const toggleLineItem = (id) => {
+    if (finalized) return;
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    if (!invoiceData || finalized) return;
+    setSelectedIds(new Set(invoiceData.lineItems.map(li => li.id)));
+  };
+
+  const clearAll = () => {
+    if (finalized) return;
+    setSelectedIds(new Set());
+  };
+
+  // Compute totals from selected items
+  const selectedLineItems = useMemo(() => {
+    if (!invoiceData) return [];
+    return invoiceData.lineItems.filter(li => selectedIds.has(li.id));
+  }, [invoiceData, selectedIds]);
+
+  const computedTotals = useMemo(() => {
+    const hours = selectedLineItems.reduce((s, i) => s + i.hours, 0);
+    const amount = selectedLineItems.reduce((s, i) => s + i.amount, 0);
+    return { hours, amount };
+  }, [selectedLineItems]);
+
+  // Finalize invoice: mark selected entries as invoiced
+  const finalizeInvoice = () => {
+    if (!invoiceData) return;
+    if (selectedIds.size === 0) {
+      alert('Select at least one line item to finalize the invoice.');
+      return;
+    }
+    const updatedEntries = appData.entries.map(e =>
+      selectedIds.has(e.id) ? { ...e, invoiced: true } : e
+    );
+    updateAppData({ entries: updatedEntries });
+    setFinalized(true);
   };
 
   // Export invoice as CSV
@@ -100,7 +144,7 @@ const InvoiceTab = ({ appData, updateAppData }) => {
     if (!invoiceData) return;
 
     const headers = ['Date', 'Task', 'Notes', 'Hours', 'Rate', 'Amount'];
-    const rows = invoiceData.lineItems.map(item => [
+    const rows = selectedLineItems.map(item => [
       item.date,
       item.task,
       item.notes,
@@ -110,7 +154,7 @@ const InvoiceTab = ({ appData, updateAppData }) => {
     ]);
 
     // Add totals row
-    rows.push(['', '', 'TOTAL', invoiceData.totals.hours.toFixed(2), '', invoiceData.totals.amount.toFixed(2)]);
+    rows.push(['', '', 'TOTAL', computedTotals.hours.toFixed(2), '', computedTotals.amount.toFixed(2)]);
 
     const csvContent = [headers, ...rows]
       .map(row => row.map(cell => `"${cell}"`).join(','))
@@ -130,7 +174,7 @@ const InvoiceTab = ({ appData, updateAppData }) => {
     if (!invoiceData) return;
 
     const printWindow = window.open('', '_blank');
-    const printContent = generatePrintHTML(invoiceData);
+    const printContent = generatePrintHTML({ ...invoiceData, lineItems: selectedLineItems, totals: computedTotals });
     
     printWindow.document.write(printContent);
     printWindow.document.close();
@@ -206,12 +250,12 @@ const InvoiceTab = ({ appData, updateAppData }) => {
                     <td class="amount">${dataService.formatCurrency(item.amount)}</td>
                 </tr>
             `).join('')}
-            <tr class="totals">
-                <td colspan="3">TOTAL</td>
-                <td><strong>${invoice.totals.hours.toFixed(2)}</strong></td>
-                <td></td>
-                <td class="amount"><strong>${dataService.formatCurrency(invoice.totals.amount)}</strong></td>
-            </tr>
+      <tr class="totals">
+        <td colspan="3">TOTAL</td>
+        <td><strong>${invoice.totals.hours.toFixed(2)}</strong></td>
+        <td></td>
+        <td class="amount"><strong>${dataService.formatCurrency(invoice.totals.amount)}</strong></td>
+      </tr>
         </tbody>
     </table>
     
@@ -230,6 +274,8 @@ const InvoiceTab = ({ appData, updateAppData }) => {
     setSelectedClient('');
     setStartDate('');
     setEndDate('');
+    setSelectedIds(new Set());
+    setFinalized(false);
   };
 
   // Set quick date ranges
@@ -261,7 +307,7 @@ const InvoiceTab = ({ appData, updateAppData }) => {
 
   return (
     <div className="space-y-6">
-      {!invoiceData ? (
+  {!invoiceData ? (
         <>
           {/* Invoice Generation Form */}
           <Card>
@@ -342,82 +388,72 @@ const InvoiceTab = ({ appData, updateAppData }) => {
         </>
       ) : (
         <>
-          {/* Generated Invoice */}
           <Card>
-            <div className="flex justify-between items-start mb-6">
+            <div className="flex justify-between items-start mb-4">
               <div>
-                <h2 className="text-2xl font-bold text-primary-600">INVOICE</h2>
-                <p className="text-gray-600">Mechanic Hours Time Tracking</p>
+                <h2 className="text-xl font-bold">Invoice</h2>
+                <p className="text-sm text-gray-500">{invoiceData.invoiceNumber}{!finalized && ' (Draft)'}</p>
+                <p className="text-xs text-gray-500">{invoiceData.dateRange.start} - {invoiceData.dateRange.end}</p>
               </div>
-              <Button variant="secondary" onClick={clearInvoice}>
-                ← Back
-              </Button>
+              <Button variant="secondary" size="small" onClick={clearInvoice}>Back</Button>
             </div>
-            
-            {/* Invoice Header */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <h3 className="font-semibold text-gray-700 mb-2">Bill To:</h3>
-                <div className="text-lg font-semibold">{invoiceData.client.name}</div>
-                {invoiceData.client.contact && (
-                  <div className="text-gray-600">{invoiceData.client.contact}</div>
-                )}
+            <div className="mb-4">
+              <div className="font-semibold">{invoiceData.client.name}</div>
+              {invoiceData.client.contact && <div className="text-xs text-gray-400">{invoiceData.client.contact}</div>}
+            </div>
+
+            {!finalized && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                <Button size="small" variant="secondary" onClick={selectAll}>Select All</Button>
+                <Button size="small" variant="secondary" onClick={clearAll}>Clear All</Button>
+                <Button size="small" onClick={finalizeInvoice} disabled={selectedIds.size === 0}>Finalize & Mark Invoiced</Button>
               </div>
-              
-              <div>
-                <h3 className="font-semibold text-gray-700 mb-2">Invoice Details:</h3>
-                <div><strong>Invoice #:</strong> {invoiceData.invoiceNumber}</div>
-                <div><strong>Date:</strong> {invoiceData.generatedDate}</div>
-                <div><strong>Period:</strong> {invoiceData.dateRange.start} - {invoiceData.dateRange.end}</div>
-              </div>
+            )}
+
+            {finalized && (
+              <div className="mb-2 text-xs text-green-600 font-medium">Finalized • {selectedIds.size} items marked invoiced</div>
+            )}
+            <div className="activity-list">
+              {invoiceData.lineItems.map(item => {
+                const checked = selectedIds.has(item.id);
+                const disabled = finalized;
+                return (
+                <div key={item.id} className={`individual-job-card ${!checked ? 'opacity-50' : ''}`} style={{position:'relative'}}>
+                  {!finalized && (
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleLineItem(item.id)}
+                      style={{position:'absolute', top:6, left:6, width:16, height:16}}
+                      disabled={disabled}
+                      title="Include in invoice"
+                    />
+                  )}
+                  <div className="job-card-content">
+                    <div className="job-main-info">
+                      <div className="job-title">{item.task}</div>
+                      <div className="job-time">{item.date} • {item.hours.toFixed(2)}h @ {dataService.formatCurrency(item.rate)}</div>
+                      {item.notes && <div className="job-notes">{item.notes}</div>}
+                    </div>
+                    <div className="job-actions" style={{alignItems:'flex-end'}}>
+                      <div className="stat-value stat-value-success" style={{fontSize:'0.85rem'}}>{dataService.formatCurrency(item.amount)}</div>
+                    </div>
+                  </div>
+                </div>
+              )})}
             </div>
-            
-            {/* Line Items */}
-            <div className="overflow-x-auto mb-6">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="border border-gray-300 px-4 py-2 text-left">Date</th>
-                    <th className="border border-gray-300 px-4 py-2 text-left">Task</th>
-                    <th className="border border-gray-300 px-4 py-2 text-left">Notes</th>
-                    <th className="border border-gray-300 px-4 py-2 text-right">Hours</th>
-                    <th className="border border-gray-300 px-4 py-2 text-right">Rate</th>
-                    <th className="border border-gray-300 px-4 py-2 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoiceData.lineItems.map(item => (
-                    <tr key={item.id}>
-                      <td className="border border-gray-300 px-4 py-2">{item.date}</td>
-                      <td className="border border-gray-300 px-4 py-2">{item.task}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-sm">{item.notes}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-right">{item.hours.toFixed(2)}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-right">{dataService.formatCurrency(item.rate)}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-right font-medium">{dataService.formatCurrency(item.amount)}</td>
-                    </tr>
-                  ))}
-                  <tr className="bg-gray-100 font-bold">
-                    <td className="border border-gray-300 px-4 py-2" colSpan="3">TOTAL</td>
-                    <td className="border border-gray-300 px-4 py-2 text-right">{invoiceData.totals.hours.toFixed(2)}</td>
-                    <td className="border border-gray-300 px-4 py-2"></td>
-                    <td className="border border-gray-300 px-4 py-2 text-right text-lg">{dataService.formatCurrency(invoiceData.totals.amount)}</td>
-                  </tr>
-                </tbody>
-              </table>
+            <div className="separator" />
+            <div className="flex justify-between text-sm font-semibold">
+              <span>Total Hours</span>
+              <span>{computedTotals.hours.toFixed(2)}h</span>
             </div>
-            
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={printInvoice} className="flex-1">
-                🖨️ Print Invoice
-              </Button>
-              <Button variant="secondary" onClick={exportCSV} className="flex-1">
-                📊 Export CSV
-              </Button>
+            <div className="flex justify-between text-sm font-semibold mt-2">
+              <span>Total Amount</span>
+              <span>{dataService.formatCurrency(computedTotals.amount)}</span>
             </div>
-            
-            <div className="text-center mt-6 text-sm text-gray-500">
-              Generated by Mechanic Hours - www.context7.com
+            <div className="flex gap-2 mt-4">
+              <Button onClick={printInvoice} className="flex-1" size="small">Print</Button>
+              <Button variant="secondary" onClick={exportCSV} className="flex-1" size="small">CSV</Button>
             </div>
           </Card>
         </>

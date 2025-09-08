@@ -15,6 +15,7 @@ const EntriesTab = ({ appData, updateAppData }) => {
   const [filterDate, setFilterDate] = useState('');
   const [editingEntry, setEditingEntry] = useState(null);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [showInvoiced, setShowInvoiced] = useState(true);
 
   // Form state for editing entries
   const [editForm, setEditForm] = useState({
@@ -28,6 +29,10 @@ const EntriesTab = ({ appData, updateAppData }) => {
   // Filter and search entries
   const filteredEntries = useMemo(() => {
     let filtered = appData.entries.filter(entry => entry.end); // Only completed entries
+
+    if (!showInvoiced) {
+      filtered = filtered.filter(e => !e.invoiced);
+    }
 
     // Search filter
     if (searchTerm) {
@@ -159,6 +164,15 @@ const EntriesTab = ({ appData, updateAppData }) => {
     setSearchTerm('');
     setFilterClient('');
     setFilterDate('');
+    setShowInvoiced(true);
+  };
+
+  // Undo invoiced flag
+  const undoInvoiced = (entryId) => {
+    const updatedEntries = appData.entries.map(e =>
+      e.id === entryId ? { ...e, invoiced: false } : e
+    );
+    updateAppData({ entries: updatedEntries });
   };
 
   return (
@@ -183,7 +197,7 @@ const EntriesTab = ({ appData, updateAppData }) => {
 
       {/* Filters */}
       <Card>
-        <h3 className="text-lg font-semibold mb-4">Filters</h3>
+  <h3 className="text-lg font-semibold mb-4">Filters</h3>
         
         <div className="space-y-3">
           <Input
@@ -208,6 +222,15 @@ const EntriesTab = ({ appData, updateAppData }) => {
               value={filterDate}
               onChange={(e) => setFilterDate(e.target.value)}
             />
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <input
+              id="toggleInvoiced"
+              type="checkbox"
+              checked={showInvoiced}
+              onChange={() => setShowInvoiced(v => !v)}
+            />
+            <label htmlFor="toggleInvoiced" className="select-none">Show invoiced entries</label>
           </div>
           
           <Button 
@@ -310,6 +333,9 @@ const EntriesTab = ({ appData, updateAppData }) => {
                       <h3 className="font-semibold">{client?.name}</h3>
                       <span className="text-gray-400">•</span>
                       <span className="text-gray-700">{taskName}</span>
+                      {entry.invoiced && (
+                        <span className="px-2 py-0.5 text-xs rounded bg-green-100 text-green-700 font-medium">Invoiced</span>
+                      )}
                     </div>
                     
                     <div className="text-sm text-gray-600 space-y-1">
@@ -337,6 +363,14 @@ const EntriesTab = ({ appData, updateAppData }) => {
                   </div>
                   
                   <div className="flex space-x-2 ml-4">
+                    {entry.invoiced && (
+                      <Button
+                        size="small"
+                        variant="secondary"
+                        onClick={() => undoInvoiced(entry.id)}
+                        title="Undo invoiced"
+                      >↩️</Button>
+                    )}
                     <Button
                       size="small"
                       variant="secondary"

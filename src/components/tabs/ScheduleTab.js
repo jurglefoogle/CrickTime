@@ -9,7 +9,7 @@ import { dataService } from '../../utils/dataService';
  * Schedule Tab Component
  * Allows creating and managing scheduled jobs with calendar view
  */
-const ScheduleTab = ({ appData, updateAppData }) => {
+const ScheduleTab = ({ appData, updateAppData, onNavigate }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
     clientId: '',
@@ -138,6 +138,30 @@ const ScheduleTab = ({ appData, updateAppData }) => {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  // Modal state for day details
+  const [modalDay, setModalDay] = useState(null); // { dateString, jobs: [] }
+
+  const startJobFromSchedule = (job) => {
+    // Create a new active entry based on scheduled job
+    const newEntry = {
+      id: dataService.generateId(),
+      clientId: job.clientId,
+      taskName: job.taskName,
+      start: Date.now(),
+      end: null,
+      notes: job.notes || '',
+      scheduledJobId: job.id
+    };
+    updateAppData({
+      entries: [...appData.entries, newEntry],
+      active: { entryId: newEntry.id }
+    });
+    setModalDay(null);
+    onNavigate && onNavigate('timer');
+  };
+
+  const closeModal = () => setModalDay(null);
+
   return (
     <div className="space-y-4">
       {/* Header with Add Button */}
@@ -260,9 +284,11 @@ const ScheduleTab = ({ appData, updateAppData }) => {
           {calendarDays.map((day, index) => (
             <div
               key={index}
-              className={`min-h-[80px] p-1 border border-gray-600 rounded ${
-                day.isCurrentMonth ? 'bg-gray-800' : 'bg-gray-900'
+              className={`cursor-pointer min-h-[80px] p-1 border border-gray-600 rounded transition-colors ${
+                day.isCurrentMonth ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-900 hover:bg-gray-800'
               } ${day.isToday ? 'ring-2 ring-red-500' : ''}`}
+              onClick={() => { if (day.jobs.length > 0) setModalDay(day); }}
+              title={day.jobs.length ? `${day.jobs.length} scheduled job(s)` : 'No jobs'}
             >
               <div className={`text-sm ${
                 day.isCurrentMonth ? 'text-gray-200' : 'text-gray-500'
@@ -296,7 +322,7 @@ const ScheduleTab = ({ appData, updateAppData }) => {
         </div>
       </Card>
 
-      {/* Upcoming Jobs List */}
+  {/* Upcoming Jobs List */}
       <Card>
         <h3 className="text-lg font-semibold mb-3 text-gray-200">This Week's Schedule</h3>
         
@@ -374,6 +400,48 @@ const ScheduleTab = ({ appData, updateAppData }) => {
           </div>
         )}
       </Card>
+      {/* Modal for day jobs */}
+      {modalDay && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={closeModal} />
+          <div className="relative w-full max-w-md bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-4 animate-fade-in-up">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-lg font-semibold text-gray-100">{new Date(modalDay.date).toLocaleDateString(undefined,{weekday:'long', month:'short', day:'numeric'})}</h3>
+              <Button variant="secondary" size="small" onClick={closeModal}>✕</Button>
+            </div>
+            {modalDay.jobs.length === 0 ? (
+              <div className="text-sm text-gray-400 py-4 text-center">No jobs scheduled</div>
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {modalDay.jobs.sort((a,b)=>a.scheduledTime.localeCompare(b.scheduledTime)).map(job => {
+                  const client = appData.clients.find(c => c.id === job.clientId);
+                  return (
+                    <div key={job.id} className="individual-job-card" style={{marginBottom:0}}>
+                      <div className="job-card-content">
+                        <div className="job-main-info">
+                          <div className="job-title">{job.taskName}</div>
+                          <div className="job-time">{job.scheduledTime}{job.estimatedHours && ` • ${job.estimatedHours}h`}</div>
+                          <div className="job-client">{client?.name || 'Unknown Client'}</div>
+                          {job.notes && <div className="job-notes">{job.notes}</div>}
+                        </div>
+                        <div className="job-actions">
+                          <Button size="small" variant="primary" onClick={() => startJobFromSchedule(job)} title="Start job">
+                            ▶️
+                          </Button>
+                          <Button size="small" variant="secondary" onClick={() => completeScheduledJob(job.id)} title="Mark complete">✓</Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="mt-3 flex justify-end">
+              <Button variant="secondary" size="small" onClick={closeModal}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

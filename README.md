@@ -59,6 +59,52 @@ This app can be deployed to:
 - GitHub Pages
 - Any static hosting service
 
+### Deploy to GitHub Pages
+
+1. Edit `package.json` and set the `homepage` field to:
+   `"https://<your-github-username>.github.io/CrickTime"`
+2. Commit and push your code to a GitHub repo named `CrickTime`.
+3. Install dependencies if not already: `npm install`.
+4. Deploy:
+   ```bash
+   npm run deploy
+   ```
+5. Visit: `https://<your-github-username>.github.io/CrickTime`.
+
+The service worker & manifest are configured for the `/CrickTime/` subpath.
+
+### PWA Installation Test
+1. Open the deployed URL in Chrome (desktop or Android).
+2. Check Lighthouse (Chrome DevTools) > PWA for installability.
+3. You can manually trigger the captured install prompt via DevTools console:
+   ```js
+   _showInstallPrompt && _showInstallPrompt();
+   ```
+4. On iOS Safari: Use Share > Add to Home Screen.
+
+### Offline / Cache Validation
+1. Load the app once online.
+2. Go offline (DevTools Network throttling > Offline).
+3. Refresh – core screens should still load (data from localStorage).
+
+### Local Backup & Restore
+In DevTools console:
+```js
+exportLocalData(); // downloads JSON backup
+// To import:
+// Create file input, pick backup file
+var i=document.createElement('input');
+i.type='file';
+i.onchange=e=>importLocalData(e.target.files[0]);
+document.body.appendChild(i);
+```
+After import the page reloads with restored state.
+
+### Clearing Cache (debug)
+```js
+clearAppCache();
+```
+
 ## Data Storage
 
 The app uses localStorage for data persistence, making it:

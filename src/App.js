@@ -34,13 +34,21 @@ function App() {
   };
 
   // Navigation tabs configuration
+  // Icon assets (fallback to emoji if image not found by build tooling)
+  const homeIcon = process.env.PUBLIC_URL + '/icons/Home.PNG';
+  const timerIcon = process.env.PUBLIC_URL + '/icons/TimeTracking.PNG';
+  const scheduleIcon = process.env.PUBLIC_URL + '/icons/Schedule.PNG';
+  const clientsIcon = process.env.PUBLIC_URL + '/icons/Clients.PNG';
+  const entriesIcon = process.env.PUBLIC_URL + '/icons/TimeTracking.PNG'; // reusing until dedicated icon
+  const invoiceIcon = process.env.PUBLIC_URL + '/icons/Invoice.PNG';
+
   const tabs = [
-    { id: 'home', label: 'Home', icon: '🏠' },
-    { id: 'timer', label: 'Timer', icon: '⏱️' },
-    { id: 'schedule', label: 'Schedule', icon: '📅' },
-    { id: 'clients', label: 'Clients', icon: '👥' },
-    { id: 'entries', label: 'Entries', icon: '📋' },
-    { id: 'invoice', label: 'Invoice', icon: '📄' }
+    { id: 'home', label: 'Home', img: homeIcon, icon: '🏠' },
+    { id: 'timer', label: 'Timer', img: timerIcon, icon: '⏱️' },
+    { id: 'schedule', label: 'Schedule', img: scheduleIcon, icon: '📅' },
+    { id: 'clients', label: 'Clients', img: clientsIcon, icon: '👥' },
+    { id: 'entries', label: 'Entries', img: entriesIcon, icon: '📋' },
+    { id: 'invoice', label: 'Invoice', img: invoiceIcon, icon: '📄' }
   ];
 
   return (
@@ -69,7 +77,8 @@ function App() {
         {activeTab === 'schedule' && (
           <ScheduleTab 
             appData={appData} 
-            updateAppData={updateAppData} 
+            updateAppData={updateAppData}
+            onNavigate={setActiveTab}
           />
         )}
         {activeTab === 'clients' && (
