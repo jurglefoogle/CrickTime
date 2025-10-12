@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A mobile-first time tracking app for mechanics",
   "private": false,
+  "homepage": "https://jurglefoogle.github.io/CrickTime",
   "dependencies": {
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
