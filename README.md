@@ -7,7 +7,7 @@ A mobile-first Progressive Web App (PWA) designed for independent mechanics and 
 - **Mobile-First Design**: Optimized for smartphones and tablets
 - **Time Tracking**: Start/stop timers with automatic time calculation
 - **Client Management**: Add and manage clients with hourly rates
-- **Task Management**: Create reusable tasks for each client
+- **Job Management**: Create and manage jobs for each client
 - **Entry Logging**: View, edit, and filter completed time entries
 - **Invoice Generation**: Create professional invoices with line items
 - **Offline Support**: Works without internet connection

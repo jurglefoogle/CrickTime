@@ -9,13 +9,16 @@ import { dataService } from '../../utils/dataService';
  * Invoice Tab Component
  * Reference: www.context7.com for invoice generation patterns
  */
-const InvoiceTab = ({ appData, updateAppData }) => {
+const InvoiceTab = ({ appData, updateAppData, invoiceContext, clearInvoiceContext }) => {
   const [selectedClient, setSelectedClient] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [invoiceData, setInvoiceData] = useState(null); // holds draft or finalized invoice meta & all candidate line items
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [finalized, setFinalized] = useState(false);
+  const [mode, setMode] = useState(invoiceContext?.jobId ? 'job' : 'client'); // 'client' | 'job'
+  const [selectedJobId, setSelectedJobId] = useState(invoiceContext?.jobId || '');
+  const [closeJobOnFinalize, setCloseJobOnFinalize] = useState(false);
 
   // Get client options
   const clientOptions = appData.clients.map(client => ({
@@ -23,10 +26,15 @@ const InvoiceTab = ({ appData, updateAppData }) => {
     label: client.name
   }));
 
-  // Generate draft invoice data (does NOT mark entries invoiced yet)
+  // Generate draft invoice data (does NOT mark entries/charges invoiced yet)
   const generateInvoice = () => {
     if (!selectedClient || !startDate || !endDate) {
       alert('Please select a client and date range');
+      return;
+    }
+
+    if (mode === 'job' && !selectedJobId) {
+      alert('Select a job for Job mode');
       return;
     }
 
@@ -36,8 +44,8 @@ const InvoiceTab = ({ appData, updateAppData }) => {
       return;
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+  const start = dataService.parseLocalDate(startDate) || new Date(startDate);
+  const end = dataService.parseLocalDate(endDate) || new Date(endDate);
     end.setHours(23, 59, 59, 999); // Include full end date
 
     if (start > end) {
@@ -49,18 +57,28 @@ const InvoiceTab = ({ appData, updateAppData }) => {
     const clientEntries = appData.entries.filter(entry => {
       if (!entry.end || entry.clientId !== selectedClient) return false;
       if (entry.invoiced) return false; // skip already invoiced
+      if (mode === 'job' && entry.jobId !== selectedJobId) return false;
       
       const entryDate = new Date(entry.start);
       return entryDate >= start && entryDate <= end;
     });
 
-    if (clientEntries.length === 0) {
-      alert('No entries found for the selected client and date range');
+    // Get charges for client within date range
+    const clientCharges = (appData.charges||[]).filter(ch => {
+      if (ch.invoiced) return false;
+      if (ch.clientId !== selectedClient) return false;
+      if (mode === 'job' && ch.jobId !== selectedJobId) return false;
+      const chDate = new Date(ch.createdAt);
+      return chDate >= start && chDate <= end;
+    });
+
+    if (clientEntries.length === 0 && clientCharges.length === 0) {
+      alert('No billable entries or charges found for the selected criteria');
       return;
     }
 
   // Create candidate line items (all initially selected)
-  const lineItems = clientEntries.map(entry => {
+  const timeLineItems = clientEntries.map(entry => {
       const taskName = entry.taskName || 'Unknown Task';
       const duration = entry.end - entry.start;
       const hours = dataService.durationToHours(duration);
@@ -77,6 +95,23 @@ const InvoiceTab = ({ appData, updateAppData }) => {
       };
     });
 
+    const chargeLineItems = clientCharges.map(ch => ({
+      id: ch.id,
+      kind: 'charge',
+      chargeType: ch.kind,
+      date: dataService.formatDate(ch.createdAt),
+      task: ch.description,
+      notes: '',
+      hours: 0,
+  rate: ch.unitPrice,
+      quantity: ch.quantity,
+  unitCost: ch.unitCost,
+      amount: ch.amountCached
+    }));
+
+    const lineItems = [...timeLineItems, ...chargeLineItems];
+
+    const jobMeta = mode === 'job' ? (appData.jobs || []).find(j => j.id === selectedJobId) : null;
     const invoice = {
       client,
       dateRange: {
@@ -84,12 +119,13 @@ const InvoiceTab = ({ appData, updateAppData }) => {
         end: dataService.formatDate(end)
       },
       lineItems,
+      job: jobMeta ? { id: jobMeta.id, name: jobMeta.name } : null,
       generatedDate: dataService.formatDate(new Date()),
       invoiceNumber: `INV-${Date.now()}`
     };
 
     setInvoiceData(invoice);
-    setSelectedIds(new Set(lineItems.map(li => li.id)));
+  setSelectedIds(new Set(lineItems.map(li => li.id)));
     setFinalized(false);
   };
 
@@ -125,17 +161,44 @@ const InvoiceTab = ({ appData, updateAppData }) => {
     return { hours, amount };
   }, [selectedLineItems]);
 
-  // Finalize invoice: mark selected entries as invoiced
+  // Finalize invoice: mark selected entries as invoiced & persist snapshot history
   const finalizeInvoice = () => {
     if (!invoiceData) return;
     if (selectedIds.size === 0) {
       alert('Select at least one line item to finalize the invoice.');
       return;
     }
-    const updatedEntries = appData.entries.map(e =>
-      selectedIds.has(e.id) ? { ...e, invoiced: true } : e
-    );
-    updateAppData({ entries: updatedEntries });
+  const updatedEntries = appData.entries.map(e => selectedIds.has(e.id) ? { ...e, invoiced: true } : e);
+  const updatedCharges = (appData.charges||[]).map(c => selectedIds.has(c.id) ? { ...c, invoiced: true } : c);
+    const snapshot = {
+      id: dataService.generateId(),
+      invoiceNumber: invoiceData.invoiceNumber,
+      clientId: invoiceData.client.id,
+      jobId: invoiceData.job?.id || null,
+      dateRange: invoiceData.dateRange,
+      generatedAt: Date.now(),
+      lineItems: selectedLineItems.map(li => ({
+        id: li.id,
+  kind: li.kind || 'time',
+  chargeType: li.chargeType,
+        date: li.date,
+        task: li.task,
+        notes: li.notes,
+        hours: li.hours,
+        rate: li.rate,
+  quantity: li.quantity,
+  unitCost: li.unitCost,
+        amount: li.amount
+      })),
+      subtotal: computedTotals.amount,
+      total: computedTotals.amount
+    };
+  let patch = { entries: updatedEntries, charges: updatedCharges, invoices: [...(appData.invoices||[]), snapshot] };
+    if (closeJobOnFinalize && invoiceData.job) {
+      const updatedJobs = (appData.jobs || []).map(j => j.id === invoiceData.job.id ? { ...j, closed: true, closedAt: Date.now() } : j);
+      patch.jobs = updatedJobs;
+    }
+    updateAppData(patch);
     setFinalized(true);
   };
 
@@ -276,6 +339,10 @@ const InvoiceTab = ({ appData, updateAppData }) => {
     setEndDate('');
     setSelectedIds(new Set());
     setFinalized(false);
+    setSelectedJobId('');
+    setMode('client');
+    setCloseJobOnFinalize(false);
+    clearInvoiceContext && clearInvoiceContext();
   };
 
   // Set quick date ranges
@@ -312,14 +379,41 @@ const InvoiceTab = ({ appData, updateAppData }) => {
           {/* Invoice Generation Form */}
           <Card>
             <h2 className="text-xl font-bold mb-4">Generate Invoice</h2>
+
+            <div className="flex gap-2 mb-3">
+              <Button size="small" variant={mode==='client'?'primary':'secondary'} onClick={()=>setMode('client')} aria-label="Invoice by client">By Client</Button>
+              <Button size="small" variant={mode==='job'?'primary':'secondary'} onClick={()=>setMode('job')} aria-label="Invoice by job">By Job</Button>
+            </div>
             
             <Select
               label="Client"
               value={selectedClient}
-              onChange={(e) => setSelectedClient(e.target.value)}
+              onChange={(e) => { setSelectedClient(e.target.value); if(mode==='job') setSelectedJobId(''); }}
               options={clientOptions}
               placeholder="Select a client"
             />
+
+      {mode === 'job' && selectedClient && (
+              <div className="mb-3">
+                <label className="input-label">Job</label>
+                <select
+                  className="select"
+                  value={selectedJobId}
+                  onChange={(e)=>setSelectedJobId(e.target.value)}
+                >
+                  <option value="">-- Select Job --</option>
+                  {(appData.jobs||[])
+                    .filter(j=>!j.closed)
+        .filter(j=> {
+          const hasBillableEntries = (appData.entries||[]).some(e=>e.jobId===j.id && e.clientId===selectedClient && e.end && !e.invoiced);
+          const hasBillableCharges = (appData.charges||[]).some(c=>c.jobId===j.id && c.clientId===selectedClient && !c.invoiced);
+          return hasBillableEntries || hasBillableCharges;
+        })
+                    .sort((a,b)=>a.name.localeCompare(b.name))
+                    .map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
+                </select>
+              </div>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Input
@@ -339,13 +433,13 @@ const InvoiceTab = ({ appData, updateAppData }) => {
             
             {/* Quick Date Buttons */}
             <div className="flex flex-wrap gap-2 mb-4">
-              <Button variant="secondary" size="small" onClick={setThisWeek}>
+              <Button variant="secondary" size="small" onClick={setThisWeek} aria-label="Set date range to this week">
                 This Week
               </Button>
-              <Button variant="secondary" size="small" onClick={setThisMonth}>
+              <Button variant="secondary" size="small" onClick={setThisMonth} aria-label="Set date range to this month">
                 This Month
               </Button>
-              <Button variant="secondary" size="small" onClick={setLastMonth}>
+              <Button variant="secondary" size="small" onClick={setLastMonth} aria-label="Set date range to last month">
                 Last Month
               </Button>
             </div>
@@ -353,9 +447,9 @@ const InvoiceTab = ({ appData, updateAppData }) => {
             <Button 
               onClick={generateInvoice}
               className="w-full"
-              disabled={!selectedClient || !startDate || !endDate}
+              disabled={!selectedClient || !startDate || !endDate || (mode==='job' && !selectedJobId)}
             >
-              📄 Generate Invoice
+              📄 Generate {mode==='job' ? 'Job' : 'Client'} Invoice
             </Button>
           </Card>
 
@@ -385,6 +479,33 @@ const InvoiceTab = ({ appData, updateAppData }) => {
               </div>
             </Card>
           )}
+          {/* Invoice History Stub */}
+          { (appData.invoices && appData.invoices.length > 0) && (
+            <Card>
+              <h3 className="text-lg font-semibold mb-3">Invoice History</h3>
+              <div className="space-y-2 max-h-56 overflow-y-auto">
+                {appData.invoices.slice().sort((a,b)=>b.generatedAt - a.generatedAt).map(inv => {
+                  const client = appData.clients.find(c=>c.id===inv.clientId);
+                  return (
+                    <div key={inv.id} className="individual-job-card" style={{marginBottom:0}}>
+                      <div className="job-card-content" style={{alignItems:'center'}}>
+                        <div className="job-main-info">
+                          <div className="job-title">{inv.invoiceNumber}</div>
+                          <div className="schedule-compact-row">
+                            <span className="job-time">{inv.dateRange.start} → {inv.dateRange.end}</span>
+                            <span className="schedule-meta-divider">•</span>
+                            <span className="job-client">{client?.name || 'Unknown Client'}</span>
+                            <span className="schedule-meta-divider">•</span>
+                            <span className="job-time">{dataService.formatCurrency(inv.total)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
         </>
       ) : (
         <>
@@ -392,7 +513,7 @@ const InvoiceTab = ({ appData, updateAppData }) => {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h2 className="text-xl font-bold">Invoice</h2>
-                <p className="text-sm text-gray-500">{invoiceData.invoiceNumber}{!finalized && ' (Draft)'}</p>
+                <p className="text-sm text-gray-500">{invoiceData.invoiceNumber}{!finalized && ' (Draft)'} {invoiceData.job && <span className="ml-1 px-1 rounded bg-blue-600 text-white text-xs">Job: {invoiceData.job.name}</span>}</p>
                 <p className="text-xs text-gray-500">{invoiceData.dateRange.start} - {invoiceData.dateRange.end}</p>
               </div>
               <Button variant="secondary" size="small" onClick={clearInvoice}>Back</Button>
@@ -404,9 +525,14 @@ const InvoiceTab = ({ appData, updateAppData }) => {
 
             {!finalized && (
               <div className="flex flex-wrap gap-2 mb-3">
-                <Button size="small" variant="secondary" onClick={selectAll}>Select All</Button>
-                <Button size="small" variant="secondary" onClick={clearAll}>Clear All</Button>
-                <Button size="small" onClick={finalizeInvoice} disabled={selectedIds.size === 0}>Finalize & Mark Invoiced</Button>
+                <Button size="small" variant="secondary" onClick={selectAll} aria-label="Select all line items">Select All</Button>
+                <Button size="small" variant="secondary" onClick={clearAll} aria-label="Clear all line items">Clear All</Button>
+                <Button size="small" onClick={finalizeInvoice} disabled={selectedIds.size === 0} aria-label="Finalize invoice and mark entries invoiced">Finalize & Mark Invoiced</Button>
+                {invoiceData.job && (
+                  <label className="flex items-center gap-1 text-xs text-gray-400 ml-auto">
+                    <input type="checkbox" checked={closeJobOnFinalize} onChange={()=>setCloseJobOnFinalize(v=>!v)} /> Close Job
+                  </label>
+                )}
               </div>
             )}
 
@@ -432,7 +558,11 @@ const InvoiceTab = ({ appData, updateAppData }) => {
                   <div className="job-card-content">
                     <div className="job-main-info">
                       <div className="job-title">{item.task}</div>
-                      <div className="job-time">{item.date} • {item.hours.toFixed(2)}h @ {dataService.formatCurrency(item.rate)}</div>
+                      {item.kind === 'charge' ? (
+                        <div className="job-time">{item.date} • {item.quantity} x {dataService.formatCurrency(item.rate)}</div>
+                      ) : (
+                        <div className="job-time">{item.date} • {item.hours.toFixed(2)}h @ {dataService.formatCurrency(item.rate)}</div>
+                      )}
                       {item.notes && <div className="job-notes">{item.notes}</div>}
                     </div>
                     <div className="job-actions" style={{alignItems:'flex-end'}}>
@@ -452,8 +582,8 @@ const InvoiceTab = ({ appData, updateAppData }) => {
               <span>{dataService.formatCurrency(computedTotals.amount)}</span>
             </div>
             <div className="flex gap-2 mt-4">
-              <Button onClick={printInvoice} className="flex-1" size="small">Print</Button>
-              <Button variant="secondary" onClick={exportCSV} className="flex-1" size="small">CSV</Button>
+              <Button onClick={printInvoice} className="flex-1" size="small" aria-label="Print invoice">Print</Button>
+              <Button variant="secondary" onClick={exportCSV} className="flex-1" size="small" aria-label="Export invoice CSV">CSV</Button>
             </div>
           </Card>
         </>

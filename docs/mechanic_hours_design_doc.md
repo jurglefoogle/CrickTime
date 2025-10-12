@@ -14,7 +14,7 @@ and mobile accessibility.
 
 -   Provide a **simple, mobile-first interface** to log time spent on
     customer jobs.
--   Support **repeat customers** with multiple ongoing tasks.
+-   Support **repeat customers** with multiple ongoing jobs.
 -   Allow **start/stop timers** for work sessions as well as manual
     edits.
 -   Enable users to **review past entries** and **generate invoices**.
@@ -34,11 +34,11 @@ and mobile accessibility.
 -   Associate tasks with specific clients.
 -   Persist client data locally.
 
-### 2. Task Management
+### 2. Job Management
 
--   Create tasks per client (e.g., "Hydraulic Pump Repair").
--   View all tasks linked to a client.
--   Reuse tasks for multiple time entries.
+-   Create jobs per client (e.g., "Hydraulic Pump Repair").
+-   View all jobs linked to a client.
+-   Reuse jobs for multiple time entries.
 
 ### 3. Time Tracking
 
@@ -105,9 +105,9 @@ and mobile accessibility.
   "clients": [
     { "id": "c1", "name": "ABC Corp", "contact": "abc@example.com", "rate": 95 }
   ],
-  "tasks": [
-    { "id": "t1", "clientId": "c1", "title": "Hydraulic Pump Repair" }
-  ],
+    "jobs": [
+        { "id": "j1", "name": "Hydraulic Pump Repair", "clientId": "c1", "closed": false }
+    ],
   "entries": [
     { "id": "e1", "clientId": "c1", "taskId": "t1", "start": 1680000000000, "end": 1680003600000, "notes": "Replaced filter" }
   ],
@@ -119,7 +119,8 @@ and mobile accessibility.
 
 1.  **App** --- main navigation & state management.
 2.  **TimerTab** --- start/stop timer, view active session.
-3.  **ClientsTab** --- add/manage clients and tasks.
+3.  **ClientsTab** --- add/manage clients.
+4.  **JobsTab** --- manage open/closed jobs.
 4.  **EntriesTab** --- list of entries, filters, edits.
 5.  **InvoiceTab** --- generate/export/print invoices, push to Drive.
 6.  **UI Primitives** --- Card, Button, Select, Input.

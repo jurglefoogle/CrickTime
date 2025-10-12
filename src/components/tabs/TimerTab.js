@@ -9,7 +9,8 @@ import { dataService } from '../../utils/dataService';
  */
 const TimerTab = ({ appData, updateAppData }) => {
   const [selectedClient, setSelectedClient] = useState('');
-  const [taskName, setTaskName] = useState('');
+  const [taskName, setTaskName] = useState(''); // free text for new job
+  const [selectedJobId, setSelectedJobId] = useState('');
   const [notes, setNotes] = useState('');
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [isTimerActive, setIsTimerActive] = useState(false);
@@ -32,7 +33,8 @@ const TimerTab = ({ appData, updateAppData }) => {
       if (activeEntry && !activeEntry.end) {
         setIsTimerActive(true);
         setSelectedClient(activeEntry.clientId);
-        setTaskName(activeEntry.taskName || '');
+  setTaskName(activeEntry.taskName || '');
+  if (activeEntry.jobId) setSelectedJobId(activeEntry.jobId);
         setNotes(activeEntry.notes || '');
       }
     }
@@ -56,21 +58,41 @@ const TimerTab = ({ appData, updateAppData }) => {
 
   // Start timer
   const startTimer = () => {
-    if (!selectedClient || !taskName.trim()) {
-      alert('Please select a client and enter a task name before starting the timer.');
+    if (!selectedClient || (!taskName.trim() && !selectedJobId)) {
+      alert('Please select a client and choose or enter a job name before starting the timer.');
       return;
+    }
+    // Resolve or create job (atomic update)
+    const existingJobs = appData.jobs || [];
+    let jobId = selectedJobId;
+    let resolvedTaskName = taskName.trim();
+    let nextJobs = existingJobs;
+    if (!jobId) {
+      const existing = existingJobs.find(j => !j.closed && j.name.toLowerCase() === resolvedTaskName.toLowerCase());
+      if (existing) {
+        jobId = existing.id;
+      } else {
+        const newJob = { id: dataService.generateId(), name: resolvedTaskName, closed: false, createdAt: Date.now() };
+        nextJobs = [...existingJobs, newJob];
+        jobId = newJob.id;
+      }
+    } else {
+      const jobObj = existingJobs.find(j => j.id === jobId);
+      if (jobObj) resolvedTaskName = jobObj.name;
     }
 
     const newEntry = {
       id: dataService.generateId(),
       clientId: selectedClient,
-      taskName: taskName.trim(),
+      taskName: resolvedTaskName,
+      jobId,
       start: Date.now(),
       end: null,
-      notes: notes
+      notes
     };
 
     updateAppData({
+      jobs: nextJobs,
       entries: [...appData.entries, newEntry],
       active: { entryId: newEntry.id }
     });
@@ -100,7 +122,8 @@ const TimerTab = ({ appData, updateAppData }) => {
 
     setIsTimerActive(false);
     setNotes('');
-    setTaskName('');
+  setTaskName('');
+  setSelectedJobId('');
   };
 
   // Update notes for active timer
@@ -181,15 +204,27 @@ const TimerTab = ({ appData, updateAppData }) => {
           </div>
 
           <div className="input-group">
-            <label className="input-label">Task</label>
+            <label className="input-label">Job</label>
+            <select
+              className="select mb-1"
+              value={selectedJobId}
+              onChange={(e)=> { setSelectedJobId(e.target.value); if(e.target.value) setTaskName(''); }}
+              disabled={isTimerActive}
+            >
+              <option value="">-- Select Existing Job --</option>
+              {(appData.jobs||[]).filter(j=>!j.closed).sort((a,b)=>a.name.localeCompare(b.name)).map(job => (
+                <option key={job.id} value={job.id}>{job.name}</option>
+              ))}
+            </select>
             <input
               type="text"
               className="input"
               value={taskName}
-              onChange={(e) => setTaskName(e.target.value)}
-              placeholder="e.g., Engine Repair"
+              onChange={(e) => { setTaskName(e.target.value); if(e.target.value) setSelectedJobId(''); }}
+              placeholder="Type new job name..."
               disabled={isTimerActive}
             />
+            <div className="text-xs text-gray-500 mt-1">Choose existing open job or type a new one.</div>
           </div>
 
           <div className="input-group">

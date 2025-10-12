@@ -8,6 +8,7 @@ import ScheduleTab from './components/tabs/ScheduleTab';
 import ClientsTab from './components/tabs/ClientsTab';
 import EntriesTab from './components/tabs/EntriesTab';
 import InvoiceTab from './components/tabs/InvoiceTab';
+import JobsTab from './components/tabs/JobsTab';
 
 // UI Components
 import Navigation from './components/ui/Navigation';
@@ -21,12 +22,29 @@ function App() {
   
   // Main application data state
   const [appData, setAppData] = useLocalStorage('mechanicHoursData', {
+    schemaVersion: 3,
     clients: [],
-    tasks: [],
     entries: [],
     scheduledJobs: [],
+    jobs: [],
+    invoices: [],
+    charges: [],
     active: null
   });
+
+  // One-time legacy cleanup for any persisted 'tasks' key
+  if (appData.tasks) {
+    const { tasks, ...rest } = appData;
+    // Write back sanitized data once
+    // eslint-disable-next-line no-console
+    console.info('Sanitizing legacy tasks key from persisted data');
+    setAppData(rest);
+  }
+
+  // Ephemeral invoice context (not persisted inside appData)
+  const [invoiceContext, setInvoiceContext] = useState(null); // { jobId?: string }
+
+  // Legacy migration removed: new installations start with explicit jobs model only.
 
   // Update app data function
   const updateAppData = (newData) => {
@@ -41,13 +59,15 @@ function App() {
   const clientsIcon = process.env.PUBLIC_URL + '/icons/Clients.PNG';
   const entriesIcon = process.env.PUBLIC_URL + '/icons/TimeTracking.PNG'; // reusing until dedicated icon
   const invoiceIcon = process.env.PUBLIC_URL + '/icons/Invoice.PNG';
+  const jobsIcon = process.env.PUBLIC_URL + '/icons/TimeTracking.PNG';
 
   const tabs = [
     { id: 'home', label: 'Home', img: homeIcon, icon: '🏠' },
     { id: 'timer', label: 'Timer', img: timerIcon, icon: '⏱️' },
     { id: 'schedule', label: 'Schedule', img: scheduleIcon, icon: '📅' },
     { id: 'clients', label: 'Clients', img: clientsIcon, icon: '👥' },
-    { id: 'entries', label: 'Entries', img: entriesIcon, icon: '📋' },
+  { id: 'entries', label: 'Entries', img: entriesIcon, icon: '📋' },
+  { id: 'jobs', label: 'Jobs', img: jobsIcon, icon: '🧰' },
     { id: 'invoice', label: 'Invoice', img: invoiceIcon, icon: '📄' }
   ];
 
@@ -93,10 +113,20 @@ function App() {
             updateAppData={updateAppData} 
           />
         )}
+        {activeTab === 'jobs' && (
+          <JobsTab
+            appData={appData}
+            updateAppData={updateAppData}
+            onNavigate={setActiveTab}
+            onInvoiceJob={(jobId) => { setInvoiceContext({ jobId }); setActiveTab('invoice'); }}
+          />
+        )}
         {activeTab === 'invoice' && (
           <InvoiceTab 
             appData={appData} 
-            updateAppData={updateAppData} 
+            updateAppData={updateAppData}
+            invoiceContext={invoiceContext}
+            clearInvoiceContext={() => setInvoiceContext(null)}
           />
         )}
       </main>

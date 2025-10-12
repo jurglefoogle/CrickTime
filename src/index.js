@@ -3,9 +3,10 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 
-// Register service worker for PWA functionality
+// Register service worker for PWA functionality only in production.
+// In development, attempt to unregister to avoid stale-cache issues.
 // Reference: www.context7.com for PWA best practices
-if ('serviceWorker' in navigator) {
+if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
   // Capture deferred install prompt
   let deferredPrompt = null;
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -98,6 +99,19 @@ if ('serviceWorker' in navigator) {
     };
     reader.readAsText(file);
   };
+} else if ('serviceWorker' in navigator) {
+  // Development: proactively unregister any existing service workers on load
+  window.addEventListener('load', async () => {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+      // After unregister, a hard reload ensures no SW control
+      // Note: not forcing reload here to avoid loops; user can hard refresh if needed.
+      console.log('SW (dev): Unregistered all service workers');
+    } catch (e) {
+      console.log('SW (dev): Unregister failed or none present');
+    }
+  });
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

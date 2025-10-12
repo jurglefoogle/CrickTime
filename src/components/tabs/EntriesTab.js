@@ -66,7 +66,7 @@ const EntriesTab = ({ appData, updateAppData }) => {
 
     // Sort by start time (newest first)
     return filtered.sort((a, b) => b.start - a.start);
-  }, [appData.entries, appData.clients, searchTerm, filterClient, filterDate]);
+  }, [appData.entries, appData.clients, searchTerm, filterClient, filterDate, showInvoiced]);
 
   // Get client options for filter
   const clientOptions = appData.clients.map(client => ({
@@ -369,12 +369,14 @@ const EntriesTab = ({ appData, updateAppData }) => {
                         variant="secondary"
                         onClick={() => undoInvoiced(entry.id)}
                         title="Undo invoiced"
+                        aria-label="Undo invoiced flag"
                       >↩️</Button>
                     )}
                     <Button
                       size="small"
                       variant="secondary"
                       onClick={() => startEditingEntry(entry)}
+                      aria-label={`Edit entry for ${client?.name || 'client'} ${taskName}`}
                     >
                       ✏️
                     </Button>
@@ -382,6 +384,7 @@ const EntriesTab = ({ appData, updateAppData }) => {
                       size="small"
                       variant="danger"
                       onClick={() => deleteEntry(entry.id)}
+                      aria-label="Delete entry"
                     >
                       🗑️
                     </Button>

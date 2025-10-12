@@ -6,13 +6,47 @@
 
 const STORAGE_KEY = 'mechanicHoursData';
 
-// Default data structure
+// Schema version
+export const CURRENT_SCHEMA_VERSION = 3;
+
+// Default data structure (legacy 'tasks' removed) + new persisted invoices collection
 const DEFAULT_DATA = {
+  schemaVersion: CURRENT_SCHEMA_VERSION,
   clients: [],
-  tasks: [],
   entries: [],
+  scheduledJobs: [],
+  jobs: [],
+  invoices: [], // finalized invoice snapshots
+  charges: [], // parts & expense charges phase 1
   active: null
 };
+
+// Migration functions keyed by fromVersion -> toVersion transformation
+// Each migration receives a mutable data object and should return it
+const migrations = [
+  // to v2
+  function toV2(data) {
+    if (!data.invoices) data.invoices = [];
+    data.schemaVersion = 2;
+    return data;
+  },
+  // to v3 - add charges collection
+  function toV3(data) {
+    if (!Array.isArray(data.charges)) data.charges = [];
+    data.schemaVersion = 3;
+    return data;
+  }
+];
+
+function applyMigrations(raw) {
+  let data = raw || {};
+  let version = typeof data.schemaVersion === 'number' ? data.schemaVersion : 1; // treat absence as v1
+  if (version < CURRENT_SCHEMA_VERSION) {
+    if (version < 2) data = migrations[0](data);
+    if (version < 3) data = migrations[1](data);
+  }
+  return data;
+}
 
 export const dataService = {
   /**
@@ -22,7 +56,20 @@ export const dataService = {
   loadData() {
     try {
       const data = localStorage.getItem(STORAGE_KEY);
-      return data ? JSON.parse(data) : DEFAULT_DATA;
+  const parsed = data ? JSON.parse(data) : DEFAULT_DATA;
+      // Legacy cleanup: remove deprecated 'tasks' array if present
+      if (parsed && parsed.tasks) {
+        delete parsed.tasks;
+      }
+      // Ensure expected arrays exist
+      if (!Array.isArray(parsed.jobs)) parsed.jobs = [];
+      if (!Array.isArray(parsed.scheduledJobs)) parsed.scheduledJobs = [];
+  // Apply migrations
+  const migrated = applyMigrations(parsed);
+  // Ensure invoices array present after migration
+  if (!Array.isArray(migrated.invoices)) migrated.invoices = [];
+  if (!Array.isArray(migrated.charges)) migrated.charges = [];
+  return migrated;
     } catch (error) {
       console.error('Error loading data:', error);
       return DEFAULT_DATA;
@@ -35,7 +82,10 @@ export const dataService = {
    */
   saveData(data) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  const clone = { ...data };
+  if (clone.tasks) delete clone.tasks; // enforce removal
+  if (!clone.schemaVersion) clone.schemaVersion = CURRENT_SCHEMA_VERSION;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(clone));
     } catch (error) {
       console.error('Error saving data:', error);
     }
@@ -55,13 +105,17 @@ export const dataService = {
    * @returns {string} Formatted duration (e.g., "2h 30m")
    */
   formatDuration(duration) {
-    if (!duration || duration < 0) return '0m';
-    
+    if (duration == null || isNaN(duration) || duration < 0) return '0m';
+    // Show seconds for very short durations (< 60s)
+    if (duration < 1000) return '<1s';
+    if (duration < 60 * 1000) {
+      const secs = Math.floor(duration / 1000);
+      return secs < 5 ? '<5s' : `${secs}s`;
+    }
     const hours = Math.floor(duration / (1000 * 60 * 60));
     const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
-    
     if (hours === 0) {
-      return `${minutes}m`;
+      return minutes === 0 ? '<1m' : `${minutes}m`;
     } else if (minutes === 0) {
       return `${hours}h`;
     } else {
@@ -115,6 +169,18 @@ export const dataService = {
       hour: '2-digit',
       minute: '2-digit'
     });
+  },
+
+  /**
+   * Parse a YYYY-MM-DD date string as a local Date (no UTC shift)
+   * @param {string} dateStr - Date string in format YYYY-MM-DD
+   * @returns {Date|null} Local date or null
+   */
+  parseLocalDate(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string') return null;
+    const [y,m,d] = dateStr.split('-').map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m-1, d, 0,0,0,0);
   },
 
   /**
@@ -189,8 +255,11 @@ export const dataService = {
       // Validate data structure
       if (data && typeof data === 'object' && 
           Array.isArray(data.clients) && 
-          Array.isArray(data.tasks) && 
           Array.isArray(data.entries)) {
+        // Provide graceful upgrade removing legacy 'tasks'
+        if (data.tasks) delete data.tasks; // legacy cleanup
+        if (!Array.isArray(data.jobs)) data.jobs = [];
+        if (!Array.isArray(data.scheduledJobs)) data.scheduledJobs = [];
         return data;
       }
       return null;

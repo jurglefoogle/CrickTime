@@ -68,10 +68,15 @@ const ClientsTab = ({ appData, updateAppData }) => {
     if (window.confirm('Are you sure you want to delete this client? All associated entries will also be deleted.')) {
       const updatedClients = appData.clients.filter(c => c.id !== clientId);
       const updatedEntries = appData.entries.filter(e => e.clientId !== clientId);
-      
+      const updatedScheduled = (appData.scheduledJobs||[]).filter(j => j.clientId !== clientId);
+      const activeEntryId = appData.active?.entryId;
+      const activeEntry = activeEntryId ? appData.entries.find(e => e.id === activeEntryId) : null;
+      const active = activeEntry && activeEntry.clientId === clientId ? null : appData.active;
       updateAppData({
         clients: updatedClients,
-        entries: updatedEntries
+        entries: updatedEntries,
+        scheduledJobs: updatedScheduled,
+        active
       });
     }
   };

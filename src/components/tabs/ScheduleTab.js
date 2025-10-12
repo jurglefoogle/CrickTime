@@ -13,12 +13,15 @@ const ScheduleTab = ({ appData, updateAppData, onNavigate }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
     clientId: '',
+    jobId: '',
     taskName: '',
     scheduledDate: '',
     scheduledTime: '',
     estimatedHours: '',
     notes: ''
   });
+  // Explicit opt-in for scheduling past dates (Issue 7 remediation)
+  const [allowPastDate, setAllowPastDate] = useState(false);
 
   // Get current date for calendar
   const now = new Date();
@@ -38,15 +41,35 @@ const ScheduleTab = ({ appData, updateAppData, onNavigate }) => {
 
   // Add new scheduled job
   const handleAddScheduledJob = () => {
-    if (!formData.clientId || !formData.taskName || !formData.scheduledDate) {
-      alert('Please fill in all required fields');
+    if (!formData.clientId || (!formData.jobId && !formData.taskName.trim()) || !formData.scheduledDate) {
+      alert('Please fill in client, job, and date');
       return;
+    }
+    const todayISO = now.toISOString().slice(0,10);
+    if (!allowPastDate && formData.scheduledDate < todayISO) {
+      alert('Past date selected. Enable "Allow past date scheduling" to proceed.');
+      return;
+    }
+    // Resolve / create job
+    let jobId = formData.jobId;
+    let resolvedName = formData.taskName.trim();
+    const jobs = appData.jobs || [];
+    if (!jobId) {
+      const existing = jobs.find(j => !j.closed && j.name.toLowerCase() === resolvedName.toLowerCase());
+      if (existing) jobId = existing.id; else {
+        const newJob = { id: dataService.generateId(), name: resolvedName, closed: false, createdAt: Date.now() };
+        updateAppData({ jobs: [...jobs, newJob] });
+        jobId = newJob.id;
+      }
+    } else {
+      const jobObj = jobs.find(j => j.id === jobId); if (jobObj) resolvedName = jobObj.name;
     }
 
     const newJob = {
       id: dataService.generateId(),
       clientId: formData.clientId,
-      taskName: formData.taskName,
+      taskName: resolvedName,
+      jobId,
       scheduledDate: formData.scheduledDate,
       scheduledTime: formData.scheduledTime || '09:00',
       estimatedHours: parseFloat(formData.estimatedHours) || 1,
@@ -62,6 +85,7 @@ const ScheduleTab = ({ appData, updateAppData, onNavigate }) => {
     // Reset form
     setFormData({
       clientId: '',
+      jobId: '',
       taskName: '',
       scheduledDate: '',
       scheduledTime: '',
@@ -103,10 +127,8 @@ const ScheduleTab = ({ appData, updateAppData, onNavigate }) => {
     
     // Generate 42 days (6 weeks) for calendar grid
     for (let i = 0; i < 42; i++) {
-      const dateString = currentDate.toISOString().split('T')[0];
-      const jobsForDay = (appData.scheduledJobs || []).filter(job => 
-        job.scheduledDate === dateString && !job.completed
-      );
+      const dateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}-${String(currentDate.getDate()).padStart(2,'0')}`;
+  const jobsForDay = (appData.scheduledJobs || []).filter(job => job.scheduledDate === dateString && !job.completed);
       
       days.push({
         date: new Date(currentDate),
@@ -129,8 +151,8 @@ const ScheduleTab = ({ appData, updateAppData, onNavigate }) => {
     setViewDate(newDate);
   };
 
-  // Format today's date for default input
-  const todayString = now.toISOString().split('T')[0];
+  // Format today's date for default input (not used currently)
+  // const todayString = now.toISOString().split('T')[0];
 
   const calendarDays = getCalendarDays();
   const monthNames = [
@@ -142,19 +164,26 @@ const ScheduleTab = ({ appData, updateAppData, onNavigate }) => {
   const [modalDay, setModalDay] = useState(null); // { dateString, jobs: [] }
 
   const startJobFromSchedule = (job) => {
+    if (appData.active) {
+      alert('A timer is already running. Stop it before starting a new job.');
+      return;
+    }
     // Create a new active entry based on scheduled job
     const newEntry = {
       id: dataService.generateId(),
       clientId: job.clientId,
-      taskName: job.taskName,
+  taskName: job.taskName,
+  jobId: job.jobId,
       start: Date.now(),
       end: null,
       notes: job.notes || '',
       scheduledJobId: job.id
     };
+    const updatedScheduled = (appData.scheduledJobs||[]).map(j => j.id === job.id ? { ...j, completed: true, startedAt: Date.now() } : j);
     updateAppData({
       entries: [...appData.entries, newEntry],
-      active: { entryId: newEntry.id }
+      active: { entryId: newEntry.id },
+      scheduledJobs: updatedScheduled
     });
     setModalDay(null);
     onNavigate && onNavigate('timer');
@@ -191,13 +220,26 @@ const ScheduleTab = ({ appData, updateAppData, onNavigate }) => {
                 }))
               ]}
             />
-
-            <Input
-              label="Task Description *"
-              value={formData.taskName}
-              onChange={(e) => handleInputChange('taskName', e.target.value)}
-              placeholder="Describe the work to be done"
-            />
+            <div>
+              <label className="input-label">Job *</label>
+              <select
+                className="select mb-1"
+                value={formData.jobId}
+                onChange={(e)=>handleInputChange('jobId', e.target.value)}
+              >
+                <option value="">-- Select Existing Job --</option>
+                {(appData.jobs||[]).filter(j=>!j.closed).sort((a,b)=>a.name.localeCompare(b.name)).map(job => (
+                  <option key={job.id} value={job.id}>{job.name}</option>
+                ))}
+              </select>
+              <input
+                className="input"
+                placeholder="Or type new job name..."
+                value={formData.taskName}
+                onChange={(e)=>{handleInputChange('taskName', e.target.value); if(e.target.value) handleInputChange('jobId','');}}
+              />
+              <div className="text-xs text-gray-500 mt-1">Select existing open job or type new.</div>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <Input
@@ -205,7 +247,7 @@ const ScheduleTab = ({ appData, updateAppData, onNavigate }) => {
                 type="date"
                 value={formData.scheduledDate}
                 onChange={(e) => handleInputChange('scheduledDate', e.target.value)}
-                min={todayString}
+                // Removed min to allow scheduling in the past for overdue badge testing per manual test plan
               />
 
               <Input
@@ -234,8 +276,24 @@ const ScheduleTab = ({ appData, updateAppData, onNavigate }) => {
               placeholder="Additional details or special instructions"
             />
 
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <input
+                id="allowPastDate"
+                type="checkbox"
+                checked={allowPastDate}
+                onChange={() => setAllowPastDate(v => !v)}
+              />
+              <label htmlFor="allowPastDate" className="select-none">Allow past date scheduling</label>
+            </div>
+            {formData.scheduledDate && !allowPastDate && formData.scheduledDate < now.toISOString().slice(0,10) && (
+              <div className="text-xs text-amber-400">Past date selected but not allowed yet. Check the box to enable.</div>
+            )}
+
             <div className="flex gap-3">
-              <Button onClick={handleAddScheduledJob}>
+              <Button 
+                onClick={handleAddScheduledJob}
+                disabled={!formData.clientId || (!formData.jobId && !formData.taskName.trim()) || !formData.scheduledDate || (!allowPastDate && formData.scheduledDate < now.toISOString().slice(0,10))}
+              >
                 Schedule Job
               </Button>
               <Button 
@@ -332,66 +390,43 @@ const ScheduleTab = ({ appData, updateAppData, onNavigate }) => {
           </div>
         ) : (
           <div className="space-y-2">
-            {appData.scheduledJobs
+      {appData.scheduledJobs
               .filter(job => !job.completed)
-              .sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate))
+              .sort((a, b) => dataService.parseLocalDate(a.scheduledDate) - dataService.parseLocalDate(b.scheduledDate))
               .map(job => {
                 const client = appData.clients.find(c => c.id === job.clientId);
-                const jobDate = new Date(job.scheduledDate);
-                const isOverdue = jobDate < now;
-                const isToday = jobDate.toDateString() === now.toDateString();
+                const jobDate = dataService.parseLocalDate(job.scheduledDate);
+                // Date-only comparisons to avoid dual Overdue+Today badges
+                const jobDateOnly = new Date(jobDate.getFullYear(), jobDate.getMonth(), jobDate.getDate());
+                const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const isToday = jobDateOnly.getTime() === todayDateOnly.getTime();
+                const isOverdue = jobDateOnly.getTime() < todayDateOnly.getTime();
+        const jobMeta = (appData.jobs || []).find(j => j.id === job.jobId);
                 
                 return (
-                  <div
-                    key={job.id}
-                    className="individual-job-card"
-                  >
-                    <div className="job-card-content">
+                  <div key={job.id} className="individual-job-card">
+                    <div className="job-card-content" style={{alignItems:'center'}}>
                       <div className="job-main-info">
-                        <div className="job-title">
-                          {job.taskName}
+                        <div className="job-title">{jobMeta ? jobMeta.name : job.taskName}</div>
+                        <div className="schedule-compact-row">
+                          <span className="job-time">{jobDate.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</span>
+                          <span className="schedule-meta-divider">•</span>
+                          <span className="job-time">{job.scheduledTime}</span>
+                          {job.estimatedHours && (<><span className="schedule-meta-divider">•</span><span>{job.estimatedHours}h</span></>)}
+                          <span className="schedule-meta-divider">•</span>
+                          <span className="job-client">{client?.name || 'Unknown Client'}</span>
+                          {(isOverdue || isToday) && (
+                            <span className="job-status">
+                              {isOverdue && <span className="status-overdue">Overdue</span>}
+                              {isToday && <span className="status-today">Today</span>}
+                            </span>
+                          )}
                         </div>
-                        <div className="job-time">
-                          {jobDate.toLocaleDateString('en-US', { 
-                            weekday: 'short',
-                            month: 'short', 
-                            day: 'numeric'
-                          })} • {job.scheduledTime}
-                          {job.estimatedHours && ` • ${job.estimatedHours}h`}
-                        </div>
-                        <div className="job-client">
-                          {client?.name || 'Unknown Client'}
-                        </div>
-                        {job.notes && (
-                          <div className="job-notes">
-                            {job.notes}
-                          </div>
-                        )}
-                        {(isOverdue || isToday) && (
-                          <div className="job-status">
-                            {isOverdue && <span className="status-overdue">Overdue</span>}
-                            {isToday && <span className="status-today">Today</span>}
-                          </div>
-                        )}
+                        {job.notes && (<div className="job-notes" title={job.notes}>{job.notes}</div>)}
                       </div>
-                      
                       <div className="job-actions">
-                        <Button
-                          size="small"
-                          variant="primary"
-                          onClick={() => completeScheduledJob(job.id)}
-                          title="Mark as complete"
-                        >
-                          ✓
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="secondary"
-                          onClick={() => deleteScheduledJob(job.id)}
-                          title="Delete job"
-                        >
-                          ✕
-                        </Button>
+                        <Button size="small" variant="primary" onClick={() => completeScheduledJob(job.id)} title="Mark as complete" aria-label="Mark scheduled job as complete">✓</Button>
+                        <Button size="small" variant="secondary" onClick={() => deleteScheduledJob(job.id)} title="Delete job" aria-label="Delete scheduled job">✕</Button>
                       </div>
                     </div>
                   </div>
@@ -415,20 +450,21 @@ const ScheduleTab = ({ appData, updateAppData, onNavigate }) => {
               <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                 {modalDay.jobs.sort((a,b)=>a.scheduledTime.localeCompare(b.scheduledTime)).map(job => {
                   const client = appData.clients.find(c => c.id === job.clientId);
+                  const jobMeta = (appData.jobs||[]).find(j=>j.id===job.jobId);
                   return (
                     <div key={job.id} className="individual-job-card" style={{marginBottom:0}}>
                       <div className="job-card-content">
                         <div className="job-main-info">
-                          <div className="job-title">{job.taskName}</div>
+                          <div className="job-title">{jobMeta ? jobMeta.name : job.taskName}</div>
                           <div className="job-time">{job.scheduledTime}{job.estimatedHours && ` • ${job.estimatedHours}h`}</div>
                           <div className="job-client">{client?.name || 'Unknown Client'}</div>
                           {job.notes && <div className="job-notes">{job.notes}</div>}
                         </div>
                         <div className="job-actions">
-                          <Button size="small" variant="primary" onClick={() => startJobFromSchedule(job)} title="Start job">
+                          <Button size="small" variant="primary" onClick={() => startJobFromSchedule(job)} title="Start job" aria-label="Start job from schedule">
                             ▶️
                           </Button>
-                          <Button size="small" variant="secondary" onClick={() => completeScheduledJob(job.id)} title="Mark complete">✓</Button>
+                          <Button size="small" variant="secondary" onClick={() => completeScheduledJob(job.id)} title="Mark complete" aria-label="Mark scheduled job complete">✓</Button>
                         </div>
                       </div>
                     </div>
