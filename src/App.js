@@ -75,7 +75,14 @@ function App() {
     <div className="app">
       {/* Header */}
       <header className="header">
-        <h1 className="header-title">Mechanic Hours</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center' }}>
+          <img 
+            src={process.env.PUBLIC_URL + '/icons/CrickTimeLogo.png'} 
+            alt="Crick Time Logo" 
+            style={{ height: '40px', width: '40px', objectFit: 'contain' }}
+          />
+          <h1 className="header-title">Crick Time</h1>
+        </div>
         <p className="header-subtitle">Time Tracking & Invoicing</p>
       </header>
 

@@ -242,90 +242,275 @@ const InvoiceTab = ({ appData, updateAppData, invoiceContext, clearInvoiceContex
     printWindow.document.write(printContent);
     printWindow.document.close();
     printWindow.focus();
-    printWindow.print();
+    
+    // Wait for content to load, then print
+    setTimeout(() => {
+      printWindow.print();
+      // Close window after print dialog is dismissed
+      setTimeout(() => {
+        printWindow.close();
+      }, 100);
+    }, 250);
   };
 
   // Generate HTML for printing
   const generatePrintHTML = (invoice) => {
+    const base = process.env.PUBLIC_URL || '';
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const logoUrl = `${origin}${base}/icons/CrickTimeLogo.png`;
     return `
 <!DOCTYPE html>
 <html>
 <head>
     <title>Invoice - ${invoice.client.name}</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
-        .header { text-align: center; margin-bottom: 40px; }
-        .invoice-title { font-size: 28px; font-weight: bold; color: #2563eb; }
-        .invoice-info { display: flex; justify-content: space-between; margin-bottom: 30px; }
-        .client-info h3, .invoice-details h3 { margin-top: 0; color: #374151; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
-        th { background-color: #f9fafb; font-weight: bold; }
-        .amount { text-align: right; }
-        .totals { font-weight: bold; background-color: #f3f4f6; }
-        .footer { margin-top: 40px; text-align: center; color: #6b7280; font-size: 14px; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 40px;
+            color: #1f2937;
+            background: #fff;
+        }
+        .invoice-container { max-width: 900px; margin: 0 auto; }
+        
+        /* Top header section - Business | Logo | Invoice Details */
+        .top-header {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 32px;
+            align-items: center;
+            padding-bottom: 24px;
+            border-bottom: 3px solid #dc2626;
+            margin-bottom: 32px;
+        }
+        
+        .business-info {
+            text-align: left;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .business-info .company-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+        .business-info div { color: #4b5563; }
+        
+        .logo-center {
+            text-align: center;
+        }
+        .logo {
+            max-height: 100px;
+            max-width: 180px;
+            object-fit: contain;
+        }
+        
+        .invoice-info {
+            text-align: right;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .invoice-info .invoice-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #dc2626;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+        .invoice-info div { color: #4b5563; }
+        .invoice-info strong { color: #1f2937; }
+        
+        /* Bill To section */
+        .bill-to-section {
+            background: #f9fafb;
+            padding: 20px 24px;
+            border-radius: 8px;
+            margin-bottom: 32px;
+            border-left: 4px solid #dc2626;
+        }
+        .bill-to-section h3 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .bill-to-section .client-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        .bill-to-section .client-contact {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        /* Invoice table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 24px;
+            font-size: 13px;
+        }
+        thead {
+            background: #1f2937;
+            color: white;
+        }
+        th {
+            padding: 14px 12px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            color: #374151;
+        }
+        tbody tr:hover {
+            background: #f9fafb;
+        }
+        .amount {
+            text-align: right;
+            font-weight: 500;
+        }
+        
+        /* Totals section */
+        .totals-section {
+            margin-top: 24px;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .totals-box {
+            min-width: 320px;
+            background: #1f2937;
+            color: white;
+            padding: 20px 24px;
+            border-radius: 8px;
+        }
+        .totals-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+        }
+        .totals-row.total {
+            border-top: 2px solid #dc2626;
+            margin-top: 8px;
+            padding-top: 12px;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        
+        /* Footer */
+        .footer {
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+        }
+        .footer p {
+            margin: 8px 0;
+            font-size: 13px;
+            color: #6b7280;
+        }
+        .terms {
+            font-weight: 600;
+            color: #dc2626;
+            font-size: 14px;
+            margin-top: 16px;
+        }
+        
         @media print {
-            body { margin: 20px; }
+            body { padding: 20px; }
             .no-print { display: none; }
+            tbody tr:hover { background: transparent; }
         }
     </style>
 </head>
 <body>
-    <div class="header">
+  <div class="invoice-container">
+    <!-- Top Header: Business Info | Logo | Invoice Details -->
+    <div class="top-header">
+      <!-- Left: Business Info -->
+      <div class="business-info">
+        <div class="company-name">Crick's Automotive and Equipment LLC</div>
+        <div>Okarche Ok 73762</div>
+        <div>(580) 791-0135</div>
+      </div>
+      
+      <!-- Center: Logo -->
+      <div class="logo-center">
+        <img class="logo" src="${logoUrl}" alt="Company Logo" />
+      </div>
+      
+      <!-- Right: Invoice Info -->
+      <div class="invoice-info">
         <div class="invoice-title">INVOICE</div>
-        <div style="margin-top: 10px; color: #6b7280;">Mechanic Hours Time Tracking</div>
+        <div><strong>Invoice #:</strong> ${invoice.invoiceNumber}</div>
+        <div><strong>Date:</strong> ${invoice.generatedDate}</div>
+        <div><strong>Period:</strong> ${invoice.dateRange.start} - ${invoice.dateRange.end}</div>
+      </div>
     </div>
     
-    <div class="invoice-info">
-        <div class="client-info">
-            <h3>Bill To:</h3>
-            <div><strong>${invoice.client.name}</strong></div>
-            ${invoice.client.contact ? `<div>${invoice.client.contact}</div>` : ''}
-        </div>
-        
-        <div class="invoice-details">
-            <h3>Invoice Details:</h3>
-            <div><strong>Invoice #:</strong> ${invoice.invoiceNumber}</div>
-            <div><strong>Date:</strong> ${invoice.generatedDate}</div>
-            <div><strong>Period:</strong> ${invoice.dateRange.start} - ${invoice.dateRange.end}</div>
-        </div>
+    <!-- Bill To Section -->
+    <div class="bill-to-section">
+      <h3>Bill To</h3>
+      <div class="client-name">${invoice.client.name}</div>
+      ${invoice.client.contact ? `<div class="client-contact">${invoice.client.contact}</div>` : ''}
     </div>
     
+    <!-- Invoice Line Items Table -->
     <table>
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Task</th>
-                <th>Notes</th>
-                <th>Hours</th>
-                <th>Rate</th>
-                <th class="amount">Amount</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${invoice.lineItems.map(item => `
-                <tr>
-                    <td>${item.date}</td>
-                    <td>${item.task}</td>
-                    <td>${item.notes}</td>
-                    <td>${item.hours.toFixed(2)}</td>
-                    <td>${dataService.formatCurrency(item.rate)}</td>
-                    <td class="amount">${dataService.formatCurrency(item.amount)}</td>
-                </tr>
-            `).join('')}
-      <tr class="totals">
-        <td colspan="3">TOTAL</td>
-        <td><strong>${invoice.totals.hours.toFixed(2)}</strong></td>
-        <td></td>
-        <td class="amount"><strong>${dataService.formatCurrency(invoice.totals.amount)}</strong></td>
-      </tr>
-        </tbody>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Task</th>
+          <th>Notes</th>
+          <th style="text-align:center">Hours</th>
+          <th style="text-align:right">Rate</th>
+          <th class="amount">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${invoice.lineItems.map(item => `
+          <tr>
+            <td>${item.date}</td>
+            <td><strong>${item.task}</strong></td>
+            <td>${item.notes}</td>
+            <td style="text-align:center">${item.hours.toFixed(2)}</td>
+            <td style="text-align:right">${dataService.formatCurrency(item.rate)}</td>
+            <td class="amount">${dataService.formatCurrency(item.amount)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
     </table>
     
-    <div class="footer">
-        <p>Generated by Mechanic Hours - www.context7.com</p>
-        <p>Thank you for your business!</p>
+    <!-- Totals Section -->
+    <div class="totals-section">
+      <div class="totals-box">
+        <div class="totals-row">
+          <span>Total Hours:</span>
+          <span>${invoice.totals.hours.toFixed(2)} hrs</span>
+        </div>
+        <div class="totals-row total">
+          <span>TOTAL DUE:</span>
+          <span>${dataService.formatCurrency(invoice.totals.amount)}</span>
+        </div>
+      </div>
     </div>
+    
+    <!-- Footer -->
+    <div class="footer">
+      <p>Thank you for your business!</p>
+      <p class="terms">All invoices are due within 30 days of Invoice date.</p>
+      <p style="margin-top:16px; color:#9ca3af; font-size:12px;">Generated by Mechanic Hours</p>
+    </div>  </div>
 </body>
 </html>
     `;
@@ -581,9 +766,9 @@ const InvoiceTab = ({ appData, updateAppData, invoiceContext, clearInvoiceContex
               <span>Total Amount</span>
               <span>{dataService.formatCurrency(computedTotals.amount)}</span>
             </div>
-            <div className="flex gap-2 mt-4">
-              <Button onClick={printInvoice} className="flex-1" size="small" aria-label="Print invoice">Print</Button>
-              <Button variant="secondary" onClick={exportCSV} className="flex-1" size="small" aria-label="Export invoice CSV">CSV</Button>
+            <div className="flex gap-2 mt-4 justify-center">
+              <Button onClick={printInvoice} size="small" aria-label="Print invoice">Print</Button>
+              <Button variant="secondary" onClick={exportCSV} size="small" aria-label="Export invoice CSV">CSV</Button>
             </div>
           </Card>
         </>
