@@ -236,21 +236,106 @@ const InvoiceTab = ({ appData, updateAppData, invoiceContext, clearInvoiceContex
   const printInvoice = () => {
     if (!invoiceData) return;
 
-    const printWindow = window.open('', '_blank');
     const printContent = generatePrintHTML({ ...invoiceData, lineItems: selectedLineItems, totals: computedTotals });
     
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-    printWindow.focus();
+    // Try to open print window first (desktop browsers)
+    const printWindow = window.open('', '_blank');
     
-    // Wait for content to load, then print
-    setTimeout(() => {
-      printWindow.print();
-      // Close window after print dialog is dismissed
+    // Check if window.open was blocked (common on mobile)
+    if (!printWindow || printWindow.closed || typeof printWindow.closed === 'undefined') {
+      // Fallback: Use iframe method for mobile devices
+      printWithIframe(printContent);
+      return;
+    }
+    
+    try {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      
+      // Wait for content to load, then print
       setTimeout(() => {
-        printWindow.close();
-      }, 100);
-    }, 250);
+        try {
+          printWindow.print();
+          // Close window after print dialog is dismissed
+          setTimeout(() => {
+            printWindow.close();
+          }, 100);
+        } catch (error) {
+          console.error('Print error:', error);
+          printWindow.close();
+          alert('Unable to print. Please try using the CSV export option instead, or check your browser settings.');
+        }
+      }, 250);
+    } catch (error) {
+      console.error('Print window error:', error);
+      if (printWindow) printWindow.close();
+      // Fallback to iframe method
+      printWithIframe(printContent);
+    }
+  };
+
+  // Fallback print method using iframe (better mobile support)
+  const printWithIframe = (content) => {
+    try {
+      // Remove any existing print iframe
+      const existingFrame = document.getElementById('print-iframe');
+      if (existingFrame) {
+        existingFrame.remove();
+      }
+      
+      // Create hidden iframe
+      const iframe = document.createElement('iframe');
+      iframe.id = 'print-iframe';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+      
+      // Write content to iframe
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(content);
+      doc.close();
+      
+      // Wait for content to load
+      iframe.onload = () => {
+        setTimeout(() => {
+          try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            
+            // Clean up after print
+            setTimeout(() => {
+              iframe.remove();
+            }, 1000);
+          } catch (error) {
+            console.error('Iframe print error:', error);
+            iframe.remove();
+            alert('Printing is not available on this device. Please use the CSV export option instead.');
+          }
+        }, 250);
+      };
+      
+      // Fallback if onload doesn't fire
+      setTimeout(() => {
+        if (document.getElementById('print-iframe')) {
+          try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+          } catch (error) {
+            console.error('Iframe print fallback error:', error);
+            alert('Printing is not available on this device. Please use the CSV export option instead.');
+          }
+        }
+      }, 1000);
+    } catch (error) {
+      console.error('Print iframe creation error:', error);
+      alert('Printing is not available on this device. Please use the CSV export option instead.');
+    }
   };
 
   // Generate HTML for printing

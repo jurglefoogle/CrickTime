@@ -32,4 +32,5 @@ Further issues will be appended below as manual test execution proceeds.
 | 7 | Calendar UX | Overdue highlighting requires allowing past dates; need user-facing control rather than silent allowance | Fixed | Added explicit checkbox 'Allow past date scheduling' gating submit | Pending |
 
 | 8 | Invoicing Charges | Cannot invoice charges-only job (no time entries) because job selector filtered by entries only and clientId inference failed | Fixed | Expanded job selector logic to include jobs with uninvoiced charges; added client selector fallback in charges panel | Pending |
+| 9 | Mobile Print | Invoice printing fails on mobile devices with "error printing page" message due to popup blocker restrictions | Fixed | Added iframe fallback method for mobile devices; enhanced error handling with user-friendly messages | Pending |
 
