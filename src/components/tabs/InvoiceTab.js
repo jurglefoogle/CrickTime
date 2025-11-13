@@ -4,6 +4,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import { dataService } from '../../utils/dataService';
+import { jsPDF } from 'jspdf';
 
 /**
  * Invoice Tab Component
@@ -232,109 +233,241 @@ const InvoiceTab = ({ appData, updateAppData, invoiceContext, clearInvoiceContex
     URL.revokeObjectURL(url);
   };
 
+  // Export invoice as PDF
+  const exportPDF = () => {
+    if (!invoiceData) return;
+
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      let yPos = margin;
+
+      // Helper function to check if we need a new page
+      const checkPageBreak = (heightNeeded) => {
+        if (yPos + heightNeeded > pageHeight - margin) {
+          doc.addPage();
+          yPos = margin;
+          return true;
+        }
+        return false;
+      };
+
+      // Add logo
+      try {
+        const logoUrl = `${window.location.origin}${process.env.PUBLIC_URL || ''}/icons/CrickTimeLogo.png`;
+        const img = new Image();
+        img.src = logoUrl;
+        
+        // Add logo at top center (we'll continue synchronously, logo will appear if it loads)
+        doc.addImage(img, 'PNG', pageWidth / 2 - 15, yPos, 30, 20);
+      } catch (logoError) {
+        console.log('Logo not loaded, continuing without it');
+      }
+      
+      yPos += 25;
+
+      // Company Header
+      doc.setFontSize(20);
+      doc.setTextColor(220, 38, 38); // Red color
+      doc.text('INVOICE', pageWidth / 2, yPos, { align: 'center' });
+      yPos += 10;
+
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Crick's Automotive and Equipment LLC", margin, yPos);
+      yPos += 5;
+      doc.text('Okarche Ok 73762', margin, yPos);
+      yPos += 5;
+      doc.text('(580) 791-0135', margin, yPos);
+      yPos += 10;
+
+      // Invoice Details (right-aligned)
+      doc.setFontSize(9);
+      doc.text(`Invoice #: ${invoiceData.invoiceNumber}`, pageWidth - margin, yPos - 20, { align: 'right' });
+      doc.text(`Date: ${invoiceData.generatedDate}`, pageWidth - margin, yPos - 15, { align: 'right' });
+      doc.text(`Period: ${invoiceData.dateRange.start} - ${invoiceData.dateRange.end}`, pageWidth - margin, yPos - 10, { align: 'right' });
+
+      // Bill To Section
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('BILL TO:', margin, yPos);
+      yPos += 6;
+      doc.setFontSize(11);
+      doc.text(invoiceData.client.name, margin, yPos);
+      yPos += 5;
+      if (invoiceData.client.contact) {
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.text(invoiceData.client.contact, margin, yPos);
+        yPos += 5;
+      }
+      yPos += 5;
+
+      // Line separator
+      doc.setDrawColor(220, 38, 38);
+      doc.setLineWidth(0.5);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 8;
+
+      // Table Header - Changed to black text on white background
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.3);
+      doc.rect(margin, yPos - 5, pageWidth - 2 * margin, 8, 'S'); // Just border, no fill
+      doc.setTextColor(0, 0, 0); // Black text
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'bold');
+      
+      const colWidths = {
+        date: 25,
+        task: 60,
+        notes: 45,
+        hours: 20,
+        rate: 20,
+        amount: 25
+      };
+      
+      let xPos = margin + 2;
+      doc.text('Date', xPos, yPos);
+      xPos += colWidths.date;
+      doc.text('Task', xPos, yPos);
+      xPos += colWidths.task;
+      doc.text('Notes', xPos, yPos);
+      xPos += colWidths.notes;
+      doc.text('Hours', xPos, yPos);
+      xPos += colWidths.hours;
+      doc.text('Rate', xPos, yPos);
+      xPos += colWidths.rate;
+      doc.text('Amount', xPos, yPos);
+      yPos += 8;
+
+      // Table Rows
+      doc.setTextColor(0, 0, 0);
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(8);
+
+      selectedLineItems.forEach((item, index) => {
+        checkPageBreak(10);
+        
+        // Alternating row colors
+        if (index % 2 === 0) {
+          doc.setFillColor(249, 250, 251);
+          doc.rect(margin, yPos - 4, pageWidth - 2 * margin, 8, 'F');
+        }
+
+        xPos = margin + 2;
+        doc.text(item.date, xPos, yPos);
+        xPos += colWidths.date;
+        
+        // Truncate long task names
+        const taskText = item.task.length > 30 ? item.task.substring(0, 27) + '...' : item.task;
+        doc.text(taskText, xPos, yPos);
+        xPos += colWidths.task;
+        
+        // Truncate long notes
+        const notesText = item.notes.length > 20 ? item.notes.substring(0, 17) + '...' : item.notes;
+        doc.text(notesText, xPos, yPos);
+        xPos += colWidths.notes;
+        
+        doc.text(item.hours.toFixed(2), xPos, yPos);
+        xPos += colWidths.hours;
+        doc.text(dataService.formatCurrency(item.rate), xPos, yPos);
+        xPos += colWidths.rate;
+        doc.text(dataService.formatCurrency(item.amount), xPos, yPos);
+        
+        yPos += 8;
+      });
+
+      yPos += 5;
+
+      // Totals Section
+      checkPageBreak(30);
+      doc.setDrawColor(220, 38, 38);
+      doc.line(pageWidth - margin - 60, yPos, pageWidth - margin, yPos);
+      yPos += 7;
+
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text('Total Hours:', pageWidth - margin - 60, yPos);
+      doc.text(`${computedTotals.hours.toFixed(2)} hrs`, pageWidth - margin, yPos, { align: 'right' });
+      yPos += 8;
+
+      doc.setFontSize(12);
+      doc.setTextColor(220, 38, 38);
+      doc.text('TOTAL DUE:', pageWidth - margin - 60, yPos);
+      doc.text(dataService.formatCurrency(computedTotals.amount), pageWidth - margin, yPos, { align: 'right' });
+      
+      // Footer
+      yPos = pageHeight - 30;
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.setFont(undefined, 'normal');
+      doc.text('Thank you for your business!', pageWidth / 2, yPos, { align: 'center' });
+      yPos += 6;
+      doc.setTextColor(220, 38, 38);
+      doc.setFont(undefined, 'bold');
+      doc.text('All invoices are due within 30 days of Invoice date.', pageWidth / 2, yPos, { align: 'center' });
+
+      // Save the PDF
+      const filename = `invoice-${invoiceData.client.name}-${invoiceData.dateRange.start}-to-${invoiceData.dateRange.end}.pdf`;
+      doc.save(filename);
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('Unable to generate PDF. Please try the CSV export option.');
+    }
+  };
+
   // Print invoice
   const printInvoice = () => {
     if (!invoiceData) return;
 
     const printContent = generatePrintHTML({ ...invoiceData, lineItems: selectedLineItems, totals: computedTotals });
     
-    // Try to open print window first (desktop browsers)
     const printWindow = window.open('', '_blank');
     
-    // Check if window.open was blocked (common on mobile)
+    // Check if window.open was blocked
     if (!printWindow || printWindow.closed || typeof printWindow.closed === 'undefined') {
-      // Fallback: Use iframe method for mobile devices
-      printWithIframe(printContent);
+      alert('Popup blocked. Please allow popups for this site to print invoices, or use the CSV export option.');
       return;
     }
     
     try {
       printWindow.document.write(printContent);
       printWindow.document.close();
-      printWindow.focus();
       
-      // Wait for content to load, then print
-      setTimeout(() => {
-        try {
-          printWindow.print();
-          // Close window after print dialog is dismissed
-          setTimeout(() => {
-            printWindow.close();
-          }, 100);
-        } catch (error) {
-          console.error('Print error:', error);
-          printWindow.close();
-          alert('Unable to print. Please try using the CSV export option instead, or check your browser settings.');
-        }
-      }, 250);
-    } catch (error) {
-      console.error('Print window error:', error);
-      if (printWindow) printWindow.close();
-      // Fallback to iframe method
-      printWithIframe(printContent);
-    }
-  };
-
-  // Fallback print method using iframe (better mobile support)
-  const printWithIframe = (content) => {
-    try {
-      // Remove any existing print iframe
-      const existingFrame = document.getElementById('print-iframe');
-      if (existingFrame) {
-        existingFrame.remove();
-      }
-      
-      // Create hidden iframe
-      const iframe = document.createElement('iframe');
-      iframe.id = 'print-iframe';
-      iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = 'none';
-      document.body.appendChild(iframe);
-      
-      // Write content to iframe
-      const doc = iframe.contentWindow.document;
-      doc.open();
-      doc.write(content);
-      doc.close();
-      
-      // Wait for content to load
-      iframe.onload = () => {
+      // Give the window time to load content before printing
+      printWindow.onload = () => {
         setTimeout(() => {
+          printWindow.focus();
           try {
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
-            
-            // Clean up after print
-            setTimeout(() => {
-              iframe.remove();
-            }, 1000);
+            printWindow.print();
           } catch (error) {
-            console.error('Iframe print error:', error);
-            iframe.remove();
-            alert('Printing is not available on this device. Please use the CSV export option instead.');
+            console.error('Print error:', error);
+            alert('Unable to complete print. You can manually print from the preview window, or use the CSV export option.');
           }
         }, 250);
       };
       
-      // Fallback if onload doesn't fire
+      // Fallback if onload doesn't fire (common on mobile)
       setTimeout(() => {
-        if (document.getElementById('print-iframe')) {
+        if (printWindow && !printWindow.closed) {
+          printWindow.focus();
           try {
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
+            printWindow.print();
           } catch (error) {
-            console.error('Iframe print fallback error:', error);
-            alert('Printing is not available on this device. Please use the CSV export option instead.');
+            console.error('Print fallback error:', error);
+            // Don't show alert here as user already has the window open
           }
         }
-      }, 1000);
+      }, 500);
+      
     } catch (error) {
-      console.error('Print iframe creation error:', error);
-      alert('Printing is not available on this device. Please use the CSV export option instead.');
+      console.error('Print window error:', error);
+      if (printWindow && !printWindow.closed) {
+        printWindow.close();
+      }
+      alert('Unable to open print window. Please try the CSV export option.');
     }
   };
 
@@ -389,6 +522,9 @@ const InvoiceTab = ({ appData, updateAppData, invoiceContext, clearInvoiceContex
             max-height: 100px;
             max-width: 180px;
             object-fit: contain;
+        }
+        .logo-hidden {
+            display: none;
         }
         
         .invoice-info {
@@ -531,7 +667,7 @@ const InvoiceTab = ({ appData, updateAppData, invoiceContext, clearInvoiceContex
       
       <!-- Center: Logo -->
       <div class="logo-center">
-        <img class="logo" src="${logoUrl}" alt="Company Logo" />
+        <img class="logo" src="${logoUrl}" alt="Company Logo" onerror="this.classList.add('logo-hidden')" loading="eager" />
       </div>
       
       <!-- Right: Invoice Info -->
@@ -852,7 +988,8 @@ const InvoiceTab = ({ appData, updateAppData, invoiceContext, clearInvoiceContex
               <span>{dataService.formatCurrency(computedTotals.amount)}</span>
             </div>
             <div className="flex gap-2 mt-4 justify-center">
-              <Button onClick={printInvoice} size="small" aria-label="Print invoice">Print</Button>
+              <Button onClick={exportPDF} size="small" aria-label="Save invoice as PDF">📄 Save PDF</Button>
+              <Button onClick={printInvoice} size="small" variant="secondary" aria-label="Print invoice">Print</Button>
               <Button variant="secondary" onClick={exportCSV} size="small" aria-label="Export invoice CSV">CSV</Button>
             </div>
           </Card>
