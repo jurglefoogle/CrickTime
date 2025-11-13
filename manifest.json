@@ -1,0 +1,18 @@
+{
+  "short_name": "CrickTime",
+  "name": "CrickTime - Time Tracking & Scheduling",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#ef4444",
+  "background_color": "#1f2937",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["productivity", "business"]
+}

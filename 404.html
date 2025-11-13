@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Redirecting…</title>
+    <meta name="robots" content="noindex" />
+    <style>
+      html,body { height:100%; margin:0; display:grid; place-items:center; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#111; color:#eee }
+      .box { text-align:center }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <div>Routing…</div>
+      <div style="font-size:12px; opacity:.7">GitHub Pages SPA redirect</div>
+    </div>
+    <script>
+      (function(){
+        // Minimal SPA redirect: send all 404s to the app root
+        var path = window.location.pathname;
+        var base = path.indexOf('/CrickTime/') === 0 ? '/CrickTime' : '';
+        // If already at root, just show a hint
+        if (path === base + '/' || path === base) return;
+        window.location.replace(base + '/');
+      })();
+    </script>
+  </body>
+</html>

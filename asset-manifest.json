@@ -1,0 +1,19 @@
+{
+  "files": {
+    "main.css": "/CrickTime/static/css/main.ea3071d5.css",
+    "main.js": "/CrickTime/static/js/main.c83ebadc.js",
+    "static/js/239.b79dff2e.chunk.js": "/CrickTime/static/js/239.b79dff2e.chunk.js",
+    "static/js/213.c79b4d56.chunk.js": "/CrickTime/static/js/213.c79b4d56.chunk.js",
+    "static/js/455.63a24093.chunk.js": "/CrickTime/static/js/455.63a24093.chunk.js",
+    "index.html": "/CrickTime/index.html",
+    "main.ea3071d5.css.map": "/CrickTime/static/css/main.ea3071d5.css.map",
+    "main.c83ebadc.js.map": "/CrickTime/static/js/main.c83ebadc.js.map",
+    "239.b79dff2e.chunk.js.map": "/CrickTime/static/js/239.b79dff2e.chunk.js.map",
+    "213.c79b4d56.chunk.js.map": "/CrickTime/static/js/213.c79b4d56.chunk.js.map",
+    "455.63a24093.chunk.js.map": "/CrickTime/static/js/455.63a24093.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.ea3071d5.css",
+    "static/js/main.c83ebadc.js"
+  ]
+}
