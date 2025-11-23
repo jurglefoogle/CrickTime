@@ -2,6 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import { Buffer } from 'buffer';
+
+// Polyfill Buffer for browser (required by Azure SDK)
+window.Buffer = Buffer;
 
 // Register service worker for PWA functionality only in production.
 // In development, attempt to unregister to avoid stale-cache issues.

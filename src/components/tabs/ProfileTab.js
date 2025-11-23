@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { dataService } from '../../utils/dataService';
+import { cloudBackupService } from '../../utils/cloudBackupService';
 
 /**
  * Profile Tab Component
@@ -17,17 +18,122 @@ const ProfileTab = ({ appData, updateAppData }) => {
   const [mileageRate, setMileageRate] = useState(
     appData.settings?.mileageRate || 0.67
   );
+  const [autoBackup, setAutoBackup] = useState(
+    appData.settings?.autoBackup || false
+  );
+
+  // Cloud backup state
+  const [cloudBackups, setCloudBackups] = useState([]);
+  const [loadingBackups, setLoadingBackups] = useState(false);
+  const [backupStatus, setBackupStatus] = useState('');
+  const [cloudAvailable, setCloudAvailable] = useState(false);
+
+  // Check if cloud backup is available
+  useEffect(() => {
+    setCloudAvailable(cloudBackupService.isAvailable());
+  }, []);
+
+  // Load cloud backups
+  const loadCloudBackups = useCallback(async () => {
+    setLoadingBackups(true);
+    const result = await cloudBackupService.listBackups();
+    if (result.success) {
+      setCloudBackups(result.backups);
+    } else {
+      console.error('Failed to load backups:', result.error);
+    }
+    setLoadingBackups(false);
+  }, []);
+
+  // Cloud backup
+  const handleCloudBackup = useCallback(async (isAuto = false) => {
+    setBackupStatus(isAuto ? 'Auto-backing up...' : 'Backing up to cloud...');
+    const result = await cloudBackupService.uploadBackup(appData);
+    
+    if (result.success) {
+      setBackupStatus(isAuto ? '✓ Auto-backup complete' : '✓ Backup uploaded successfully!');
+      loadCloudBackups(); // Refresh list
+      if (!isAuto) {
+        setTimeout(() => setBackupStatus(''), 3000);
+      }
+    } else {
+      setBackupStatus(`❌ Backup failed: ${result.error}`);
+      setTimeout(() => setBackupStatus(''), 5000);
+    }
+  }, [appData, loadCloudBackups]);
+
+  // Load cloud backups on mount
+  useEffect(() => {
+    if (cloudAvailable) {
+      loadCloudBackups();
+    }
+  }, [cloudAvailable, loadCloudBackups]);
+
+  // Auto-backup when data changes (if enabled)
+  useEffect(() => {
+    if (autoBackup && cloudAvailable && appData.entries?.length > 0) {
+      const lastBackupTime = localStorage.getItem('lastAutoBackupTime');
+      const now = Date.now();
+      const oneHour = 60 * 60 * 1000;
+      
+      // Only auto-backup once per hour
+      if (!lastBackupTime || now - parseInt(lastBackupTime) > oneHour) {
+        handleCloudBackup(true);
+        localStorage.setItem('lastAutoBackupTime', now.toString());
+      }
+    }
+  }, [appData, autoBackup, cloudAvailable, handleCloudBackup]);
 
   // Save settings
   const saveSettings = () => {
     const settings = {
       businessName: businessName.trim(),
       defaultRate: defaultRate ? parseFloat(defaultRate) : null,
-      mileageRate: parseFloat(mileageRate)
+      mileageRate: parseFloat(mileageRate),
+      autoBackup
     };
 
     updateAppData({ settings });
     alert('Settings saved successfully!');
+  };
+
+  // Restore from cloud backup
+  const handleCloudRestore = async (filename) => {
+    if (!window.confirm(`Restore from backup: ${filename}?\n\nThis will replace all current data.`)) {
+      return;
+    }
+
+    setBackupStatus('Restoring from cloud...');
+    const result = await cloudBackupService.downloadBackup(filename);
+    
+    if (result.success) {
+      updateAppData(result.data);
+      setBackupStatus('✓ Data restored successfully!');
+      setTimeout(() => {
+        alert('Data restored! Refreshing...');
+        window.location.reload();
+      }, 1000);
+    } else {
+      setBackupStatus(`❌ Restore failed: ${result.error}`);
+      setTimeout(() => setBackupStatus(''), 5000);
+    }
+  };
+
+  // Delete cloud backup
+  const handleDeleteCloudBackup = async (filename) => {
+    if (!window.confirm(`Delete backup: ${filename}?`)) {
+      return;
+    }
+
+    const result = await cloudBackupService.deleteBackup(filename);
+    if (result.success) {
+      setBackupStatus('✓ Backup deleted');
+      loadCloudBackups();
+      setTimeout(() => setBackupStatus(''), 2000);
+    } else {
+      setBackupStatus(`❌ Delete failed: ${result.error}`);
+      setTimeout(() => setBackupStatus(''), 5000);
+    }
   };
 
   // Export data
@@ -118,7 +224,7 @@ const ProfileTab = ({ appData, updateAppData }) => {
           />
           <h2 className="page-title" style={{ marginBottom: '4px' }}>Crick Time</h2>
           <p style={{ color: '#6b7280', fontSize: '14px' }}>Time Tracking & Invoicing</p>
-          <p style={{ color: '#9ca3af', fontSize: '12px', marginTop: '8px' }}>Version 1.0.0</p>
+          <p style={{ color: '#9ca3af', fontSize: '12px', marginTop: '8px' }}>Version 1.1.0</p>
         </div>
       </Card>
 
@@ -206,11 +312,150 @@ const ProfileTab = ({ appData, updateAppData }) => {
             </div>
           </div>
 
+          {cloudAvailable && (
+            <div className="input-group">
+              <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  checked={autoBackup}
+                  onChange={(e) => setAutoBackup(e.target.checked)}
+                  style={{ width: '18px', height: '18px' }}
+                />
+                <span>Enable Auto-Backup to Cloud</span>
+              </label>
+              <div className="text-xs text-gray-500 mt-1">
+                Automatically backup your data to Azure every hour
+              </div>
+            </div>
+          )}
+
           <Button onClick={saveSettings} size="large">
             💾 Save Settings
           </Button>
         </div>
       </Card>
+
+      {/* Cloud Backup */}
+      {cloudAvailable && (
+        <Card>
+          <h3 className="card-title">☁️ Cloud Backup</h3>
+          
+          {backupStatus && (
+            <div style={{ 
+              padding: '12px', 
+              marginBottom: '16px', 
+              borderRadius: '6px',
+              backgroundColor: backupStatus.includes('❌') ? '#fee2e2' : '#d1fae5',
+              color: backupStatus.includes('❌') ? '#dc2626' : '#065f46',
+              fontSize: '14px'
+            }}>
+              {backupStatus}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <Button 
+              variant="primary" 
+              size="large"
+              onClick={() => handleCloudBackup(false)}
+              style={{ width: '100%' }}
+            >
+              ☁️ Backup to Cloud Now
+            </Button>
+
+            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px', marginTop: '8px' }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                marginBottom: '12px'
+              }}>
+                <h4 style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>
+                  Available Backups
+                </h4>
+                <Button 
+                  variant="secondary" 
+                  size="small"
+                  onClick={loadCloudBackups}
+                  disabled={loadingBackups}
+                >
+                  {loadingBackups ? '...' : '🔄'}
+                </Button>
+              </div>
+
+              {cloudBackups.length === 0 ? (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '24px', 
+                  color: '#6b7280',
+                  fontSize: '14px'
+                }}>
+                  {loadingBackups ? 'Loading backups...' : 'No cloud backups found'}
+                </div>
+              ) : (
+                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                  {cloudBackups.map((backup, index) => (
+                    <div 
+                      key={backup.filename}
+                      style={{
+                        padding: '12px',
+                        marginBottom: '8px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        backgroundColor: index === 0 ? '#f0f9ff' : '#fff'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '13px', fontWeight: '500', marginBottom: '4px' }}>
+                            {new Date(backup.lastModified).toLocaleString()}
+                            {index === 0 && (
+                              <span style={{ 
+                                marginLeft: '8px', 
+                                fontSize: '11px', 
+                                color: '#0284c7',
+                                fontWeight: '600'
+                              }}>
+                                LATEST
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                            Size: {(backup.size / 1024).toFixed(1)} KB
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <Button
+                            variant="secondary"
+                            size="small"
+                            onClick={() => handleCloudRestore(backup.filename)}
+                            style={{ fontSize: '11px', padding: '4px 12px' }}
+                          >
+                            Restore
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="small"
+                            onClick={() => handleDeleteCloudBackup(backup.filename)}
+                            style={{ 
+                              fontSize: '11px', 
+                              padding: '4px 12px',
+                              backgroundColor: '#fee2e2',
+                              color: '#dc2626'
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Data Management */}
       <Card>

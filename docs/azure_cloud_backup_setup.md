@@ -1,0 +1,214 @@
+# Azure Cloud Backup Setup Instructions
+
+This app uses Azure Blob Storage with Entra (Azure AD) authentication for cloud backup functionality.
+
+## Prerequisites
+
+1. Azure subscription
+2. Storage account: `cricktime`
+3. App registration in Azure AD
+
+## Azure AD App Registration Setup
+
+The app is already registered with:
+- **Client ID**: `4cb6959c-34a4-4715-9b75-6f39042c0b44`
+- **Object ID**: `27ca3635-7c8c-4a0f-b803-53fb8a7c6dae`
+
+### Required Configuration in Azure Portal
+
+1. **Navigate to App Registration**
+   - Go to Azure Portal → Azure Active Directory → App registrations
+   - Find app with Client ID: `4cb6959c-34a4-4715-9b75-6f39042c0b44`
+
+2. **Configure Supported Account Types**
+   - Click "Authentication" in left menu
+   - Under "Supported account types", select one of:
+     - **Accounts in this organizational directory only** (Single tenant - for org users only)
+     - **Accounts in any organizational directory** (Multi-tenant - for any org)
+     - **Accounts in any organizational directory and personal Microsoft accounts** (if supporting personal accounts)
+   - Save changes
+
+3. **Configure Authentication Platform**
+   - Still in "Authentication" section
+   - Under "Platform configurations", click "Add a platform"
+   - Select **Single-page application**
+   - Add Redirect URIs (add ALL of these):
+     - `http://localhost:3000` (for local development)
+     - `http://localhost:3000/` (with trailing slash)
+     - `https://jurglefoogle.github.io/CrickTime` (for GitHub Pages production)
+     - `https://jurglefoogle.github.io/CrickTime/` (with trailing slash)
+   - Under "Implicit grant and hybrid flows":
+     - ✅ Check **Access tokens (used for implicit flows)**
+     - ✅ Check **ID tokens (used for implicit and hybrid flows)**
+   - Click "Configure"
+   - Save all changes
+
+4. **Configure API Permissions**
+   - Click "API permissions" in left menu
+   - Click "Add a permission"
+   - Select **Azure Storage**
+   - Select **Delegated permissions**
+   - Check **user_impersonation**
+   - Click "Add permissions"
+   - (Optional) Add **Microsoft Graph** → **User.Read** for user profile info
+   - Click "Grant admin consent for [Your Organization]" button at top (if you're admin)
+   - Ensure all permissions show "Granted" status
+
+## Storage Account Setup
+
+### 1. Verify Storage Account exists
+- Storage Account Name: `cricktime`
+- Resource ID: `748922a0-28e1-48db-9162-0e9094f6e793`
+
+### 2. Assign User Permissions
+
+Each user needs the **Storage Blob Data Contributor** role:
+
+**Via Azure Portal:**
+1. Navigate to Storage Account `cricktime`
+2. Click "Access Control (IAM)" in left menu
+3. Click "+ Add" → "Add role assignment"
+4. Select role: **Storage Blob Data Contributor**
+5. Click "Next"
+6. Click "+ Select members"
+7. Search for and select the user's email/name
+8. Click "Select"
+9. Click "Review + assign"
+
+**Via Azure CLI:**
+```bash
+# Get user's Object ID
+az ad user show --id user@domain.com --query id -o tsv
+
+# Assign role
+az role assignment create \
+  --role "Storage Blob Data Contributor" \
+  --assignee <USER_OBJECT_ID> \
+  --scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RESOURCE_GROUP>/providers/Microsoft.Storage/storageAccounts/cricktime"
+```
+
+**Via PowerShell:**
+```powershell
+# Get user
+$user = Get-AzADUser -UserPrincipalName "user@domain.com"
+
+# Assign role
+New-AzRoleAssignment `
+  -ObjectId $user.Id `
+  -RoleDefinitionName "Storage Blob Data Contributor" `
+  -Scope "/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RESOURCE_GROUP>/providers/Microsoft.Storage/storageAccounts/cricktime"
+```
+
+## Container Setup
+
+The app will automatically create a `backups` container if it doesn't exist (requires proper permissions).
+
+To manually create it:
+1. Go to Storage Account `cricktime` in Azure Portal
+2. Click "Containers" in left menu
+3. Click "+ Container"
+4. Name: `backups`
+5. Public access level: **Private**
+6. Click "Create"
+
+## Environment Variables
+
+### For Local Development
+Copy `.env.local` in the project root:
+
+```env
+REACT_APP_AZURE_STORAGE_ACCOUNT=cricktime
+REACT_APP_AZURE_CONTAINER=backups
+REACT_APP_AZURE_TENANT_ID=common
+REACT_APP_AZURE_CLIENT_ID=4cb6959c-34a4-4715-9b75-6f39042c0b44
+```
+
+### For GitHub Pages Deployment
+The environment variables are embedded in the build via `.env.production` file (already configured).
+
+The GitHub Actions workflow will automatically:
+1. Build the app with production environment variables
+2. Deploy to GitHub Pages at: `https://jurglefoogle.github.io/CrickTime/`
+
+**Note**: The app is configured to work both locally (`localhost:3000`) and on GitHub Pages with the `/CrickTime` subpath.
+
+## Deployment to GitHub Pages
+
+The app automatically deploys to GitHub Pages when you push to the `main` branch.
+
+### Deployment Process
+1. Push changes to `main` branch
+2. GitHub Actions workflow automatically:
+   - Installs dependencies
+   - Builds the app with `PUBLIC_URL=/CrickTime`
+   - Deploys to `gh-pages` branch
+3. App is available at: `https://jurglefoogle.github.io/CrickTime/`
+
+### Verify Deployment
+1. Check GitHub Actions tab for build status
+2. Visit `https://jurglefoogle.github.io/CrickTime/`
+3. Test cloud backup login (should redirect properly)
+
+### Important Notes for GitHub Pages
+- The app uses client-side routing with hash-based routing for GitHub Pages compatibility
+- Azure AD redirect URIs must include the full GitHub Pages URL
+- The PWA service worker is configured to handle the `/CrickTime` subpath
+- All assets load correctly with the `PUBLIC_URL` environment variable
+
+## User Experience
+
+Each user gets their own backup folder automatically:
+- Backups are organized by user: `backups/user@email.com/backup-2025-11-23.json`
+- Users can only see their own backups
+- No risk of overwriting another user's data
+
+When a user tries to backup for the first time:
+1. They click "Backup to Cloud Now" in Profile tab
+2. A popup window opens for Azure login
+3. They sign in with their Azure AD credentials
+4. They consent to app permissions (first time only)
+5. The backup uploads to their Azure Blob Storage
+
+## Troubleshooting
+
+### "unauthorized_client: The client does not exist or is not enabled for consumers"
+This means the app registration needs to be configured:
+1. Go to App Registration → Authentication
+2. Change "Supported account types" to include the type of accounts you want to support
+3. Ensure redirect URIs include your current URL (including http://localhost:3000)
+4. Enable both "Access tokens" and "ID tokens" under implicit grant
+5. Save and wait 5-10 minutes for changes to propagate
+6. Clear browser cache and try again
+
+### "Access Denied" Error
+- Verify user has "Storage Blob Data Contributor" role assigned
+- Check role assignment scope (should be on storage account or container)
+- Wait a few minutes for role assignment to propagate
+
+### "Authentication Failed" Error
+- Verify App Registration redirect URIs include current URL
+- Check API permissions are granted
+- Try signing out and back in
+
+### "Container Not Found" Error
+- Verify storage account name is correct
+- Check container name is `backups`
+- Ensure user has permission to create containers
+
+### "CORS Error"
+- Go to Storage Account → Settings → Resource sharing (CORS)
+- Add rule for Blob service:
+  - Allowed origins: `http://localhost:3000` or your domain
+  - Allowed methods: GET, PUT, POST, DELETE, HEAD, OPTIONS
+  - Allowed headers: `*`
+  - Exposed headers: `*`
+  - Max age: `3600`
+
+## Security Notes
+
+- Each user authenticates with their own Azure AD account
+- Backups are stored in their organization's storage account
+- No shared credentials or API keys in the application
+- Uses OAuth 2.0 with PKCE flow for browser security
+- Tokens are never exposed to the application code
+- All communication uses HTTPS
