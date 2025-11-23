@@ -1012,6 +1012,13 @@ body {
   text-align: center;
 }
 
+.slide-menu-icon-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  margin-right: 4px;
+}
+
 .slide-menu-label {
   font-weight: 500;
 }

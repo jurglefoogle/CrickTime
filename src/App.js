@@ -61,8 +61,8 @@ function App() {
   const homeIcon = process.env.PUBLIC_URL + '/icons/Home.PNG';
   const timerIcon = process.env.PUBLIC_URL + '/icons/TimeTracking.PNG';
   const invoiceIcon = process.env.PUBLIC_URL + '/icons/Invoice.PNG';
-  const jobsIcon = process.env.PUBLIC_URL + '/icons/TimeTracking.PNG';
-  const mileageIcon = process.env.PUBLIC_URL + '/icons/TimeTracking.PNG'; // reusing until dedicated icon
+  const jobsIcon = process.env.PUBLIC_URL + '/icons/Settings.PNG';
+  const mileageIcon = process.env.PUBLIC_URL + '/icons/Mileage.PNG';
 
   // Bottom navigation tabs (main features)
   const tabs = [

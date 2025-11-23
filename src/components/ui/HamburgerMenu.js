@@ -7,11 +7,16 @@ import React, { useState } from 'react';
 const HamburgerMenu = ({ onNavigate, activeTab }) => {
   const [isOpen, setIsOpen] = useState(false);
 
+  const scheduleIcon = process.env.PUBLIC_URL + '/icons/Schedule.PNG';
+  const clientsIcon = process.env.PUBLIC_URL + '/icons/Clients.PNG';
+  const entriesIcon = process.env.PUBLIC_URL + '/icons/Entries.png';
+  const profileIcon = process.env.PUBLIC_URL + '/icons/Profile.PNG';
+
   const menuItems = [
-    { id: 'schedule', label: 'Schedule', icon: '📅' },
-    { id: 'clients', label: 'Clients', icon: '👥' },
-    { id: 'entries', label: 'Entries', icon: '📋' },
-    { id: 'profile', label: 'Profile', icon: '⚙️' }
+    { id: 'schedule', label: 'Schedule', icon: '📅', img: scheduleIcon },
+    { id: 'clients', label: 'Clients', icon: '👥', img: clientsIcon },
+    { id: 'entries', label: 'Entries', icon: '📋', img: entriesIcon },
+    { id: 'profile', label: 'Profile', icon: '⚙️', img: profileIcon }
   ];
 
   const handleMenuClick = (tabId) => {
@@ -68,7 +73,16 @@ const HamburgerMenu = ({ onNavigate, activeTab }) => {
                 className={`slide-menu-button ${activeTab === item.id ? 'slide-menu-button-active' : ''}`}
                 onClick={() => handleMenuClick(item.id)}
               >
-                <span className="slide-menu-icon">{item.icon}</span>
+                {item.img ? (
+                  <img
+                    src={item.img}
+                    alt={item.label}
+                    className="slide-menu-icon-img"
+                    draggable="false"
+                  />
+                ) : (
+                  <span className="slide-menu-icon">{item.icon}</span>
+                )}
                 <span className="slide-menu-label">{item.label}</span>
               </button>
             </li>
