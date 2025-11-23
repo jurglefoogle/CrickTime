@@ -11,7 +11,6 @@ const STORAGE_ACCOUNT = process.env.REACT_APP_AZURE_STORAGE_ACCOUNT || 'cricktim
 const CONTAINER_NAME = process.env.REACT_APP_AZURE_CONTAINER || 'backups';
 const TENANT_ID = process.env.REACT_APP_AZURE_TENANT_ID || 'consumers';
 const CLIENT_ID = process.env.REACT_APP_AZURE_CLIENT_ID || 'd64bd21a-1627-4ff5-96b7-c1cef325cf5a';
-const SAS_TOKEN = process.env.REACT_APP_AZURE_SAS_TOKEN || '';
 
 class CloudBackupService {
   constructor() {
@@ -71,28 +70,28 @@ class CloudBackupService {
         }
       }
       
-      // Step 2: Connect to blob storage using SAS token
+      // Step 2: Connect to blob storage using user's Entra credentials
       const accountUrl = `https://${STORAGE_ACCOUNT}.blob.core.windows.net`;
       
-      // Create BlobServiceClient with SAS token for read/write access
-      const urlWithSAS = SAS_TOKEN ? `${accountUrl}${SAS_TOKEN}` : accountUrl;
-      this.blobServiceClient = new BlobServiceClient(urlWithSAS);
+      // Create BlobServiceClient with user's Entra credentials for RBAC-based access
+      // User must have "Storage Blob Data Contributor" role on the storage account
+      this.blobServiceClient = new BlobServiceClient(accountUrl, this.credential);
       
       // Get container client
       this.containerClient = this.blobServiceClient.getContainerClient(CONTAINER_NAME);
       
-      // Test anonymous access by trying to list blobs
+      // Test access by trying to list blobs with user's credentials
       try {
-        // Try a simple operation to verify container is accessible
+        // Try a simple operation to verify container is accessible with RBAC
         const iter = this.containerClient.listBlobsFlat({ maxPageSize: 1 });
         await iter.next();
-        console.log('Successfully connected to Azure Blob Storage with SAS token');
+        console.log('Successfully connected to Azure Blob Storage with Entra credentials');
         this.authenticated = true;
       } catch (error) {
         if (error.statusCode === 404) {
           throw new Error('Storage container not found. Please ensure the container exists.');
         } else if (error.statusCode === 403 || error.statusCode === 401) {
-          throw new Error('Access denied. Please ensure you have a valid SAS token configured in REACT_APP_AZURE_SAS_TOKEN.');
+          throw new Error('Access denied. Please ensure you have "Storage Blob Data Contributor" role on the storage account.');
         } else {
           throw error;
         }
