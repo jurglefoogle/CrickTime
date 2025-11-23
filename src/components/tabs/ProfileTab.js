@@ -202,7 +202,6 @@ const ProfileTab = ({ appData, updateAppData }) => {
   const totalClients = appData.clients?.length || 0;
   const totalJobs = appData.jobs?.length || 0;
   const totalEntries = appData.entries?.filter(e => e.end)?.length || 0;
-  const totalInvoices = appData.invoices?.length || 0;
   const totalTrips = appData.mileageTrips?.filter(t => t.endTime)?.length || 0;
 
   const totalHours = dataService.calculateTotalHours(
