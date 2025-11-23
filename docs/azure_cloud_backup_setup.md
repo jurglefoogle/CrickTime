@@ -20,16 +20,30 @@ The app is already registered with:
    - Go to Azure Portal → Azure Active Directory → App registrations
    - Find app with Client ID: `4cb6959c-34a4-4715-9b75-6f39042c0b44`
 
-2. **Configure Authentication**
+2. **Configure Supported Account Types**
    - Click "Authentication" in left menu
-   - Under "Platform configurations", add **Single-page application**
-   - Add Redirect URIs:
-     - `http://localhost:3000` (for local development)
-     - Your production URL (e.g., `https://yourdomain.com`)
-   - Under "Implicit grant and hybrid flows": Check **ID tokens**
+   - Under "Supported account types", select one of:
+     - **Accounts in this organizational directory only** (Single tenant - for org users only)
+     - **Accounts in any organizational directory** (Multi-tenant - for any org)
+     - **Accounts in any organizational directory and personal Microsoft accounts** (if supporting personal accounts)
    - Save changes
 
-3. **Configure API Permissions**
+3. **Configure Authentication Platform**
+   - Still in "Authentication" section
+   - Under "Platform configurations", click "Add a platform"
+   - Select **Single-page application**
+   - Add Redirect URIs:
+     - `http://localhost:3000` (for local development)
+     - `http://localhost:3000/` (with trailing slash)
+     - Your production URL (e.g., `https://yourdomain.com`)
+     - Your production URL with trailing slash
+   - Under "Implicit grant and hybrid flows":
+     - ✅ Check **Access tokens (used for implicit flows)**
+     - ✅ Check **ID tokens (used for implicit and hybrid flows)**
+   - Click "Configure"
+   - Save all changes
+
+4. **Configure API Permissions**
    - Click "API permissions" in left menu
    - Click "Add a permission"
    - Select **Azure Storage**
@@ -37,7 +51,8 @@ The app is already registered with:
    - Check **user_impersonation**
    - Click "Add permissions"
    - (Optional) Add **Microsoft Graph** → **User.Read** for user profile info
-   - Click "Grant admin consent" (if you're admin)
+   - Click "Grant admin consent for [Your Organization]" button at top (if you're admin)
+   - Ensure all permissions show "Granted" status
 
 ## Storage Account Setup
 
@@ -109,6 +124,11 @@ REACT_APP_AZURE_CLIENT_ID=4cb6959c-34a4-4715-9b75-6f39042c0b44
 
 ## User Experience
 
+Each user gets their own backup folder automatically:
+- Backups are organized by user: `backups/user@email.com/backup-2025-11-23.json`
+- Users can only see their own backups
+- No risk of overwriting another user's data
+
 When a user tries to backup for the first time:
 1. They click "Backup to Cloud Now" in Profile tab
 2. A popup window opens for Azure login
@@ -117,6 +137,15 @@ When a user tries to backup for the first time:
 5. The backup uploads to their Azure Blob Storage
 
 ## Troubleshooting
+
+### "unauthorized_client: The client does not exist or is not enabled for consumers"
+This means the app registration needs to be configured:
+1. Go to App Registration → Authentication
+2. Change "Supported account types" to include the type of accounts you want to support
+3. Ensure redirect URIs include your current URL (including http://localhost:3000)
+4. Enable both "Access tokens" and "ID tokens" under implicit grant
+5. Save and wait 5-10 minutes for changes to propagate
+6. Clear browser cache and try again
 
 ### "Access Denied" Error
 - Verify user has "Storage Blob Data Contributor" role assigned

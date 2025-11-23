@@ -79,27 +79,41 @@ class CloudBackupService {
   }
 
   /**
-   * Generate a unique backup filename
+   * Generate a unique backup filename with user identifier
    */
-  generateBackupFilename(userId = 'default') {
+  async generateBackupFilename(userId = null) {
+    // If no userId provided, try to get from authenticated user
+    if (!userId && this.credential) {
+      try {
+        // Get user info from token
+        const token = await this.credential.getToken(['https://storage.azure.com/.default']);
+        // Parse JWT to get user identifier (will be email or object ID)
+        const payload = JSON.parse(atob(token.token.split('.')[1]));
+        userId = payload.preferred_username || payload.unique_name || payload.oid || 'default';
+      } catch (error) {
+        console.warn('Could not get user ID from token, using default', error);
+        userId = 'default';
+      }
+    }
+    
+    const sanitizedUserId = (userId || 'default').replace(/[^a-zA-Z0-9-_.]/g, '_');
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    return `backup-${userId}-${timestamp}.json`;
+    return `${sanitizedUserId}/backup-${timestamp}.json`;
   }
 
   /**
    * Upload backup to cloud storage
    * @param {Object} data - The data to backup
-   * @param {string} userId - User identifier (optional)
    * @returns {Object} { success, filename, error }
    */
-  async uploadBackup(data, userId = 'default') {
+  async uploadBackup(data) {
     try {
       const isReady = await this.initialize();
       if (!isReady) {
         throw new Error(this.error || 'Cloud backup not initialized');
       }
 
-      const filename = this.generateBackupFilename(userId);
+      const filename = await this.generateBackupFilename();
       const blobClient = this.containerClient.getBlockBlobClient(filename);
       
       const jsonData = JSON.stringify(data, null, 2);
@@ -113,7 +127,6 @@ class CloudBackupService {
             blobContentType: 'application/json'
           },
           metadata: {
-            userId,
             timestamp: new Date().toISOString(),
             appVersion: '1.0',
             dataVersion: String(data.schemaVersion || 1)
@@ -173,19 +186,29 @@ class CloudBackupService {
   }
 
   /**
-   * List available backups
-   * @param {string} userId - User identifier (optional)
+   * List available backups for current user
    * @returns {Array} List of backup files
    */
-  async listBackups(userId = 'default') {
+  async listBackups() {
     try {
       const isReady = await this.initialize();
       if (!isReady) {
         throw new Error(this.error || 'Cloud backup not initialized');
       }
 
+      // Get current user identifier
+      let userId = 'default';
+      try {
+        const token = await this.credential.getToken(['https://storage.azure.com/.default']);
+        const payload = JSON.parse(atob(token.token.split('.')[1]));
+        userId = payload.preferred_username || payload.unique_name || payload.oid || 'default';
+        userId = userId.replace(/[^a-zA-Z0-9-_.]/g, '_');
+      } catch (error) {
+        console.warn('Could not get user ID, listing all backups');
+      }
+
       const backups = [];
-      const prefix = `backup-${userId}-`;
+      const prefix = `${userId}/`;
       
       for await (const blob of this.containerClient.listBlobsFlat({ prefix })) {
         backups.push({
@@ -202,7 +225,8 @@ class CloudBackupService {
       console.log(`Found ${backups.length} backups for user ${userId}`);
       return {
         success: true,
-        backups
+        backups,
+        userId
       };
     } catch (error) {
       console.error('List backups failed:', error);
