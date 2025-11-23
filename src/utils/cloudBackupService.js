@@ -11,7 +11,11 @@ const STORAGE_ACCOUNT = process.env.REACT_APP_AZURE_STORAGE_ACCOUNT || 'cricktim
 const CONTAINER_NAME = process.env.REACT_APP_AZURE_CONTAINER || 'backups';
 const TENANT_ID = process.env.REACT_APP_AZURE_TENANT_ID || 'consumers';
 const CLIENT_ID = process.env.REACT_APP_AZURE_CLIENT_ID || 'd64bd21a-1627-4ff5-96b7-c1cef325cf5a';
-const SAS_TOKEN = process.env.REACT_APP_AZURE_SAS_TOKEN || '';
+
+// Get SAS token from runtime config (production) or environment variable (local dev)
+const getSasToken = () => {
+  return (window.CRICKTIME_CONFIG?.AZURE_SAS_TOKEN) || process.env.REACT_APP_AZURE_SAS_TOKEN || '';
+};
 
 class CloudBackupService {
   constructor() {
@@ -73,6 +77,10 @@ class CloudBackupService {
       
       // Step 2: Connect to blob storage using SAS token
       const accountUrl = `https://${STORAGE_ACCOUNT}.blob.core.windows.net`;
+      
+      // Get SAS token at runtime
+      const SAS_TOKEN = getSasToken();
+      console.log('SAS Token configured:', SAS_TOKEN ? 'Yes' : 'No');
       
       // Create BlobServiceClient with SAS token for read/write access
       const urlWithSAS = SAS_TOKEN ? `${accountUrl}${SAS_TOKEN}` : accountUrl;
