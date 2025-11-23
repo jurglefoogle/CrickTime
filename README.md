@@ -13,6 +13,7 @@ A mobile-first Progressive Web App (PWA) designed for independent mechanics and 
 - **Offline Support**: Works without internet connection
 - **PWA Capabilities**: Install on mobile devices like a native app
 - **Export Options**: Print invoices or export as CSV
+- **Cloud Backup**: Azure Storage integration for automatic backups (requires setup)
 
 ## Technology Stack
 
@@ -58,6 +59,23 @@ This app can be deployed to:
 - Vercel
 - GitHub Pages
 - Any static hosting service
+
+### Cloud Backup Setup (Optional)
+
+To enable cloud backup functionality with Azure Storage:
+
+1. For local development, copy the example file:
+   ```bash
+   cp .env.production.example .env.production
+   ```
+   Then edit `.env.production` and add your Azure SAS token.
+
+2. For GitHub Pages deployment, set up GitHub Secrets:
+   - Go to your repository Settings → Secrets and variables → Actions
+   - Add a secret named `AZURE_SAS_TOKEN` with your Azure SAS token value
+   - See `docs/GITHUB_SECRETS_SETUP.md` for detailed instructions
+
+**Note:** The app works perfectly without cloud backup configured. It will use local storage only until Azure credentials are provided.
 
 ### Deploy to GitHub Pages
 
