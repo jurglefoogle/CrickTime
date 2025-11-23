@@ -51,6 +51,27 @@ body {
   padding: 10px 0 6px;
   text-align: center;
   border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header > div:first-child {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: center;
+}
+
+.header > div:nth-child(2) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .header-title { /* previously app-title */
@@ -834,4 +855,220 @@ body {
   font-weight: 500;
 }
 
+/* Hamburger Menu Styles */
+.hamburger-button {
+  background: none;
+  border: none;
+  padding: 12px;
+  cursor: pointer;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.hamburger-button:hover {
+  transform: scale(1.05);
+}
+
+.hamburger-icon {
+  width: 24px;
+  height: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+}
+
+.hamburger-line {
+  width: 100%;
+  height: 2px;
+  background-color: var(--text-primary);
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.hamburger-line.open:nth-child(1) {
+  transform: translateY(8px) rotate(45deg);
+}
+
+.hamburger-line.open:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-line.open:nth-child(3) {
+  transform: translateY(-8px) rotate(-45deg);
+}
+
+/* Menu Overlay */
+.menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 999;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Slide-out Menu */
+.slide-menu {
+  position: fixed;
+  top: 0;
+  left: -300px; /* Hidden off-screen when closed */
+  width: 280px;
+  height: 100vh;
+  background-color: var(--bg-secondary);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  /* No animation; instantaneous */
+  pointer-events: none; /* Prevent focus/click while closed */
+}
+
+.slide-menu-open {
+  left: 0; /* Visible when open */
+  pointer-events: auto; /* Re-enable interaction */
+}
+
+.slide-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.slide-menu-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.slide-menu-close {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.slide-menu-close:hover {
+  color: var(--accent-blue);
+}
+
+.slide-menu-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex: 1;
+}
+
+.slide-menu-item {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.slide-menu-button {
+  width: 100%;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.slide-menu-button:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--accent-blue);
+}
+
+.slide-menu-button-active {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--accent-blue);
+  border-left: 3px solid var(--accent-blue);
+}
+
+.slide-menu-icon {
+  font-size: 1.5rem;
+  width: 30px;
+  text-align: center;
+}
+
+.slide-menu-icon-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  margin-right: 4px;
+}
+
+.slide-menu-label {
+  font-weight: 500;
+}
+
+.slide-menu-footer {
+  padding: 20px;
+  border-top: 1px solid var(--border-subtle);
+  text-align: center;
+}
+
+.slide-menu-version {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Stat item clickable enhancement */
+.stat-click {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stat-click:hover {
+  background-color: var(--bg-secondary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Activity item variants */
+.activity-item-success {
+  border-left-color: var(--success);
+}
+
+.activity-item-warning {
+  border-left-color: var(--warning);
+}
+
+.activity-item-error {
+  border-left-color: var(--error);
+}
+
+/* Page title */
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+/* Text color utilities */
+.text-gray-500 {
+  color: var(--text-muted);
+}
 

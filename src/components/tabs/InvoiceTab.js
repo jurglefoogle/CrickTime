@@ -278,6 +278,8 @@ const InvoiceTab = ({ appData, updateAppData, invoiceContext, clearInvoiceContex
       doc.setTextColor(0, 0, 0);
       doc.text("Crick's Automotive and Equipment LLC", margin, yPos);
       yPos += 5;
+      doc.text('117 S 2nd street', margin, yPos);
+      yPos += 5;
       doc.text('Okarche Ok 73762', margin, yPos);
       yPos += 5;
       doc.text('(580) 791-0135', margin, yPos);
@@ -661,6 +663,7 @@ const InvoiceTab = ({ appData, updateAppData, invoiceContext, clearInvoiceContex
       <!-- Left: Business Info -->
       <div class="business-info">
         <div class="company-name">Crick's Automotive and Equipment LLC</div>
+        <div>117 S 2nd street</div>
         <div>Okarche Ok 73762</div>
         <div>(580) 791-0135</div>
       </div>
