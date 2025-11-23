@@ -5,6 +5,8 @@
   "private": false,
   "homepage": "https://jurglefoogle.github.io/CrickTime",
   "dependencies": {
+    "@azure/identity": "^4.13.0",
+    "@azure/storage-blob": "^12.29.1",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
@@ -17,11 +19,11 @@
     "web-vitals": "^2.1.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.47.2",
     "autoprefixer": "^10.4.13",
     "cross-env": "^10.0.0",
     "postcss": "^8.4.21",
-  "tailwindcss": "^3.2.4",
-  "@playwright/test": "^1.47.2"
+    "tailwindcss": "^3.2.4"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -30,9 +32,9 @@
     "build:gh": "cross-env PUBLIC_URL=/CrickTime react-scripts build",
     "deploy": "npm run build:gh && gh-pages -d build",
     "test": "react-scripts test",
-  "test:e2e": "playwright test",
-  "test:e2e:ui": "playwright test --ui",
-  "test:e2e:report": "playwright show-report",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
