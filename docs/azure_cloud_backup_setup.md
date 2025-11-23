@@ -32,11 +32,11 @@ The app is already registered with:
    - Still in "Authentication" section
    - Under "Platform configurations", click "Add a platform"
    - Select **Single-page application**
-   - Add Redirect URIs:
+   - Add Redirect URIs (add ALL of these):
      - `http://localhost:3000` (for local development)
      - `http://localhost:3000/` (with trailing slash)
-     - Your production URL (e.g., `https://yourdomain.com`)
-     - Your production URL with trailing slash
+     - `https://jurglefoogle.github.io/CrickTime` (for GitHub Pages production)
+     - `https://jurglefoogle.github.io/CrickTime/` (with trailing slash)
    - Under "Implicit grant and hybrid flows":
      - ✅ Check **Access tokens (used for implicit flows)**
      - ✅ Check **ID tokens (used for implicit and hybrid flows)**
@@ -113,7 +113,8 @@ To manually create it:
 
 ## Environment Variables
 
-Copy `.env.local` in the project root (already configured):
+### For Local Development
+Copy `.env.local` in the project root:
 
 ```env
 REACT_APP_AZURE_STORAGE_ACCOUNT=cricktime
@@ -121,6 +122,38 @@ REACT_APP_AZURE_CONTAINER=backups
 REACT_APP_AZURE_TENANT_ID=common
 REACT_APP_AZURE_CLIENT_ID=4cb6959c-34a4-4715-9b75-6f39042c0b44
 ```
+
+### For GitHub Pages Deployment
+The environment variables are embedded in the build via `.env.production` file (already configured).
+
+The GitHub Actions workflow will automatically:
+1. Build the app with production environment variables
+2. Deploy to GitHub Pages at: `https://jurglefoogle.github.io/CrickTime/`
+
+**Note**: The app is configured to work both locally (`localhost:3000`) and on GitHub Pages with the `/CrickTime` subpath.
+
+## Deployment to GitHub Pages
+
+The app automatically deploys to GitHub Pages when you push to the `main` branch.
+
+### Deployment Process
+1. Push changes to `main` branch
+2. GitHub Actions workflow automatically:
+   - Installs dependencies
+   - Builds the app with `PUBLIC_URL=/CrickTime`
+   - Deploys to `gh-pages` branch
+3. App is available at: `https://jurglefoogle.github.io/CrickTime/`
+
+### Verify Deployment
+1. Check GitHub Actions tab for build status
+2. Visit `https://jurglefoogle.github.io/CrickTime/`
+3. Test cloud backup login (should redirect properly)
+
+### Important Notes for GitHub Pages
+- The app uses client-side routing with hash-based routing for GitHub Pages compatibility
+- Azure AD redirect URIs must include the full GitHub Pages URL
+- The PWA service worker is configured to handle the `/CrickTime` subpath
+- All assets load correctly with the `PUBLIC_URL` environment variable
 
 ## User Experience
 

@@ -37,7 +37,7 @@ class CloudBackupService {
       this.credential = new InteractiveBrowserCredential({
         tenantId: TENANT_ID,
         clientId: CLIENT_ID,
-        redirectUri: window.location.origin, // Current app URL
+        redirectUri: window.location.origin + window.location.pathname.replace(/\/$/, ''), // Support GitHub Pages subpath
         loginHint: '', // Optional: pre-fill user email
       });
 
