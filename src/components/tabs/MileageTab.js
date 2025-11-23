@@ -36,6 +36,7 @@ const MileageTab = ({ appData, updateAppData }) => {
         startLocationTracking(activeTrip);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appData.active, appData.mileageTrips]);
 
   // Calculate distance between two coordinates using Haversine formula
