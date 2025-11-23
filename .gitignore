@@ -1,28 +1,60 @@
 # Dependencies
 node_modules/
+/.pnp
+.pnp.js
 
 # Build output
 build/
+dist/
 
 # Local env
 .env*
+!.env.example
+
+# Testing
+coverage/
+.nyc_output/
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
 
 # Editor
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.history/
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Playwright artifacts
 playwright-report/
 test-results/
+playwright/.cache/
+
+# React Scripts
+.eslintcache
+
+# Temporary files
+*.tmp
+*.bak
+.cache/
 
 # gh-pages cache
 node_modules/.cache/gh-pages/
+node_modules/.cache/default-development/3.pack
+.gh-pages-cache/
+
+# Git internals (shouldn't normally appear but just in case)
+*.pack
+*.idx
+*.eslintcache
+*.pack.old
