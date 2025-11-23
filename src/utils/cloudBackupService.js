@@ -97,9 +97,11 @@ class CloudBackupService {
       const blobClient = this.containerClient.getBlockBlobClient(filename);
       
       const jsonData = JSON.stringify(data, null, 2);
-      const uploadResponse = await blobClient.upload(
+      const contentLength = new Blob([jsonData]).size;
+      
+      await blobClient.upload(
         jsonData,
-        Buffer.byteLength(jsonData),
+        contentLength,
         {
           blobHTTPHeaders: {
             blobContentType: 'application/json'
@@ -119,7 +121,7 @@ class CloudBackupService {
         filename,
         url: blobClient.url,
         timestamp: new Date().toISOString(),
-        size: Buffer.byteLength(jsonData)
+        size: contentLength
       };
     } catch (error) {
       console.error('Upload backup failed:', error);
@@ -145,10 +147,9 @@ class CloudBackupService {
       const blobClient = this.containerClient.getBlockBlobClient(filename);
       const downloadResponse = await blobClient.download(0);
       
-      // Read the blob content
-      const downloaded = await this.streamToBuffer(downloadResponse.readableStreamBody);
-      const jsonData = downloaded.toString('utf8');
-      const data = JSON.parse(jsonData);
+      // Read the blob content as text in browser
+      const text = await downloadResponse.blobBody.text();
+      const data = JSON.parse(text);
 
       console.log('Backup downloaded successfully:', filename);
       return {
@@ -238,22 +239,6 @@ class CloudBackupService {
    */
   isAvailable() {
     return !!(CONNECTION_STRING || (CLIENT_ID && (TENANT_ID && CLIENT_SECRET)));
-  }
-
-  /**
-   * Helper to convert stream to buffer
-   */
-  async streamToBuffer(readableStream) {
-    return new Promise((resolve, reject) => {
-      const chunks = [];
-      readableStream.on('data', (data) => {
-        chunks.push(data instanceof Buffer ? data : Buffer.from(data));
-      });
-      readableStream.on('end', () => {
-        resolve(Buffer.concat(chunks));
-      });
-      readableStream.on('error', reject);
-    });
   }
 }
 

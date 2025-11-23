@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { dataService } from '../../utils/dataService';
@@ -33,12 +33,41 @@ const ProfileTab = ({ appData, updateAppData }) => {
     setCloudAvailable(cloudBackupService.isAvailable());
   }, []);
 
+  // Load cloud backups
+  const loadCloudBackups = useCallback(async () => {
+    setLoadingBackups(true);
+    const result = await cloudBackupService.listBackups();
+    if (result.success) {
+      setCloudBackups(result.backups);
+    } else {
+      console.error('Failed to load backups:', result.error);
+    }
+    setLoadingBackups(false);
+  }, []);
+
+  // Cloud backup
+  const handleCloudBackup = useCallback(async (isAuto = false) => {
+    setBackupStatus(isAuto ? 'Auto-backing up...' : 'Backing up to cloud...');
+    const result = await cloudBackupService.uploadBackup(appData);
+    
+    if (result.success) {
+      setBackupStatus(isAuto ? '✓ Auto-backup complete' : '✓ Backup uploaded successfully!');
+      loadCloudBackups(); // Refresh list
+      if (!isAuto) {
+        setTimeout(() => setBackupStatus(''), 3000);
+      }
+    } else {
+      setBackupStatus(`❌ Backup failed: ${result.error}`);
+      setTimeout(() => setBackupStatus(''), 5000);
+    }
+  }, [appData, loadCloudBackups]);
+
   // Load cloud backups on mount
   useEffect(() => {
     if (cloudAvailable) {
       loadCloudBackups();
     }
-  }, [cloudAvailable]);
+  }, [cloudAvailable, loadCloudBackups]);
 
   // Auto-backup when data changes (if enabled)
   useEffect(() => {
@@ -53,7 +82,7 @@ const ProfileTab = ({ appData, updateAppData }) => {
         localStorage.setItem('lastAutoBackupTime', now.toString());
       }
     }
-  }, [appData, autoBackup, cloudAvailable]);
+  }, [appData, autoBackup, cloudAvailable, handleCloudBackup]);
 
   // Save settings
   const saveSettings = () => {
@@ -66,35 +95,6 @@ const ProfileTab = ({ appData, updateAppData }) => {
 
     updateAppData({ settings });
     alert('Settings saved successfully!');
-  };
-
-  // Load cloud backups
-  const loadCloudBackups = async () => {
-    setLoadingBackups(true);
-    const result = await cloudBackupService.listBackups();
-    if (result.success) {
-      setCloudBackups(result.backups);
-    } else {
-      console.error('Failed to load backups:', result.error);
-    }
-    setLoadingBackups(false);
-  };
-
-  // Cloud backup
-  const handleCloudBackup = async (isAuto = false) => {
-    setBackupStatus(isAuto ? 'Auto-backing up...' : 'Backing up to cloud...');
-    const result = await cloudBackupService.uploadBackup(appData);
-    
-    if (result.success) {
-      setBackupStatus(isAuto ? '✓ Auto-backup complete' : '✓ Backup uploaded successfully!');
-      loadCloudBackups(); // Refresh list
-      if (!isAuto) {
-        setTimeout(() => setBackupStatus(''), 3000);
-      }
-    } else {
-      setBackupStatus(`❌ Backup failed: ${result.error}`);
-      setTimeout(() => setBackupStatus(''), 5000);
-    }
   };
 
   // Restore from cloud backup
