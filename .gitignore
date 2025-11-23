@@ -56,3 +56,5 @@ node_modules/.cache/default-development/3.pack
 # Git internals (shouldn't normally appear but just in case)
 *.pack
 *.idx
+*.eslintcache
+*.pack.old
