@@ -7,7 +7,7 @@
 const STORAGE_KEY = 'mechanicHoursData';
 
 // Schema version
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 // Default data structure (legacy 'tasks' removed) + new persisted invoices collection
 const DEFAULT_DATA = {
@@ -18,6 +18,8 @@ const DEFAULT_DATA = {
   jobs: [],
   invoices: [], // finalized invoice snapshots
   charges: [], // parts & expense charges phase 1
+  mileageTrips: [], // mileage tracking trips
+  settings: {}, // user settings (business name, rates, preferences)
   active: null
 };
 
@@ -35,6 +37,18 @@ const migrations = [
     if (!Array.isArray(data.charges)) data.charges = [];
     data.schemaVersion = 3;
     return data;
+  },
+  // to v4 - add mileageTrips collection
+  function toV4(data) {
+    if (!Array.isArray(data.mileageTrips)) data.mileageTrips = [];
+    data.schemaVersion = 4;
+    return data;
+  },
+  // to v5 - add settings object
+  function toV5(data) {
+    if (!data.settings || typeof data.settings !== 'object') data.settings = {};
+    data.schemaVersion = 5;
+    return data;
   }
 ];
 
@@ -44,6 +58,8 @@ function applyMigrations(raw) {
   if (version < CURRENT_SCHEMA_VERSION) {
     if (version < 2) data = migrations[0](data);
     if (version < 3) data = migrations[1](data);
+    if (version < 4) data = migrations[2](data);
+    if (version < 5) data = migrations[3](data);
   }
   return data;
 }
@@ -69,6 +85,8 @@ export const dataService = {
   // Ensure invoices array present after migration
   if (!Array.isArray(migrated.invoices)) migrated.invoices = [];
   if (!Array.isArray(migrated.charges)) migrated.charges = [];
+  if (!Array.isArray(migrated.mileageTrips)) migrated.mileageTrips = [];
+  if (!migrated.settings || typeof migrated.settings !== 'object') migrated.settings = {};
   return migrated;
     } catch (error) {
       console.error('Error loading data:', error);
@@ -142,6 +160,16 @@ export const dataService = {
       style: 'currency',
       currency: 'USD'
     }).format(amount);
+  },
+
+  /**
+   * Format mileage distance
+   * @param {number} miles - Distance in miles
+   * @returns {string} Formatted mileage string
+   */
+  formatMileage(miles) {
+    if (miles == null || isNaN(miles) || miles < 0) return '0.0 mi';
+    return `${miles.toFixed(1)} mi`;
   },
 
   /**
