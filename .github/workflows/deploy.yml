@@ -24,8 +24,6 @@ jobs:
         run: npm ci
 
       - name: Build (PUBLIC_URL=/CrickTime)
-        env:
-          REACT_APP_AZURE_SAS_TOKEN: ${{ secrets.AZURE_SAS_TOKEN }}
         run: PUBLIC_URL=/CrickTime npm run build
 
       - name: Deploy to gh-pages
