@@ -1,73 +1,79 @@
 import { BlobServiceClient } from '@azure/storage-blob';
-import { DefaultAzureCredential, ClientSecretCredential } from '@azure/identity';
+import { InteractiveBrowserCredential } from '@azure/identity';
 
 /**
  * Cloud Backup Service
  * Handles backup and restore operations with Azure Blob Storage
+ * Uses Entra (Azure AD) interactive authentication for browser
  */
 
 const STORAGE_ACCOUNT = process.env.REACT_APP_AZURE_STORAGE_ACCOUNT || 'cricktime';
 const CONTAINER_NAME = process.env.REACT_APP_AZURE_CONTAINER || 'backups';
-const TENANT_ID = process.env.REACT_APP_AZURE_TENANT_ID;
+const TENANT_ID = process.env.REACT_APP_AZURE_TENANT_ID || 'common'; // 'common' for multi-tenant
 const CLIENT_ID = process.env.REACT_APP_AZURE_CLIENT_ID || '4cb6959c-34a4-4715-9b75-6f39042c0b44';
-const CLIENT_SECRET = process.env.REACT_APP_AZURE_CLIENT_SECRET;
-
-// Connection string fallback for development
-const CONNECTION_STRING = process.env.REACT_APP_AZURE_STORAGE_CONNECTION_STRING;
 
 class CloudBackupService {
   constructor() {
     this.blobServiceClient = null;
     this.containerClient = null;
+    this.credential = null;
     this.initialized = false;
+    this.authenticated = false;
     this.error = null;
   }
 
   /**
-   * Initialize the Azure Blob Storage client
+   * Initialize the Azure Blob Storage client with Entra authentication
    */
   async initialize() {
-    if (this.initialized) return true;
+    if (this.initialized && this.authenticated) return true;
 
     try {
-      // Try connection string first (simpler for development)
-      if (CONNECTION_STRING) {
-        console.log('Using connection string authentication');
-        this.blobServiceClient = BlobServiceClient.fromConnectionString(CONNECTION_STRING);
-      } 
-      // Try Entra (Azure AD) authentication with client credentials
-      else if (TENANT_ID && CLIENT_ID && CLIENT_SECRET) {
-        console.log('Using Entra client credentials authentication');
-        const credential = new ClientSecretCredential(TENANT_ID, CLIENT_ID, CLIENT_SECRET);
-        const accountUrl = `https://${STORAGE_ACCOUNT}.blob.core.windows.net`;
-        this.blobServiceClient = new BlobServiceClient(accountUrl, credential);
-      }
-      // Try default Azure credential (for production/managed identity)
-      else if (CLIENT_ID) {
-        console.log('Using default Azure credential');
-        const credential = new DefaultAzureCredential({
-          managedIdentityClientId: CLIENT_ID
-        });
-        const accountUrl = `https://${STORAGE_ACCOUNT}.blob.core.windows.net`;
-        this.blobServiceClient = new BlobServiceClient(accountUrl, credential);
-      }
-      else {
-        throw new Error('No Azure credentials configured. Please set environment variables.');
-      }
+      console.log('Initializing Azure Blob Storage with Entra authentication...');
+      
+      const accountUrl = `https://${STORAGE_ACCOUNT}.blob.core.windows.net`;
+      
+      // Create interactive browser credential for user login
+      this.credential = new InteractiveBrowserCredential({
+        tenantId: TENANT_ID,
+        clientId: CLIENT_ID,
+        redirectUri: window.location.origin, // Current app URL
+        loginHint: '', // Optional: pre-fill user email
+      });
 
+      // Create BlobServiceClient with the credential
+      this.blobServiceClient = new BlobServiceClient(accountUrl, this.credential);
+      
       // Get container client
       this.containerClient = this.blobServiceClient.getContainerClient(CONTAINER_NAME);
       
-      // Ensure container exists
-      await this.containerClient.createIfNotExists();
+      // Test authentication by trying to access the container
+      try {
+        await this.containerClient.getProperties();
+        console.log('Successfully authenticated and connected to Azure Blob Storage');
+        this.authenticated = true;
+      } catch (error) {
+        // If container doesn't exist, try to create it
+        if (error.statusCode === 404) {
+          console.log('Container not found, attempting to create...');
+          await this.containerClient.create();
+          console.log('Container created successfully');
+          this.authenticated = true;
+        } else if (error.statusCode === 403) {
+          throw new Error('Access denied. Please ensure your Azure account has Storage Blob Data Contributor role on the storage account.');
+        } else {
+          throw error;
+        }
+      }
       
       this.initialized = true;
       this.error = null;
       return true;
     } catch (error) {
       console.error('Failed to initialize cloud backup:', error);
-      this.error = error.message;
+      this.error = error.message || 'Authentication failed';
       this.initialized = false;
+      this.authenticated = false;
       return false;
     }
   }
@@ -238,7 +244,17 @@ class CloudBackupService {
    * Check if cloud backup is available and configured
    */
   isAvailable() {
-    return !!(CONNECTION_STRING || (CLIENT_ID && (TENANT_ID && CLIENT_SECRET)));
+    return !!(CLIENT_ID && STORAGE_ACCOUNT);
+  }
+
+  /**
+   * Sign out the user
+   */
+  async signOut() {
+    this.authenticated = false;
+    this.initialized = false;
+    this.credential = null;
+    console.log('Signed out from Azure');
   }
 }
 

@@ -6,6 +6,7 @@
   "homepage": "https://jurglefoogle.github.io/CrickTime",
   "dependencies": {
     "@azure/identity": "^4.13.0",
+    "@azure/msal-browser": "^4.26.2",
     "@azure/storage-blob": "^12.29.1",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
