@@ -90,7 +90,7 @@ const HamburgerMenu = ({ onNavigate, activeTab }) => {
         </ul>
 
         <div className="slide-menu-footer">
-          <div className="slide-menu-version">Crick Time v1.0</div>
+          <div className="slide-menu-version">Crick Time v1.1</div>
         </div>
       </nav>
     </>

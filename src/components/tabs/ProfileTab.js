@@ -225,7 +225,7 @@ const ProfileTab = ({ appData, updateAppData }) => {
           />
           <h2 className="page-title" style={{ marginBottom: '4px' }}>Crick Time</h2>
           <p style={{ color: '#6b7280', fontSize: '14px' }}>Time Tracking & Invoicing</p>
-          <p style={{ color: '#9ca3af', fontSize: '12px', marginTop: '8px' }}>Version 1.0.0</p>
+          <p style={{ color: '#9ca3af', fontSize: '12px', marginTop: '8px' }}>Version 1.1.0</p>
         </div>
       </Card>
 

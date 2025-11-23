@@ -4,13 +4,14 @@ import { InteractiveBrowserCredential } from '@azure/identity';
 /**
  * Cloud Backup Service
  * Handles backup and restore operations with Azure Blob Storage
- * Uses Entra (Azure AD) interactive authentication for browser
+ * Uses Entra for user identification + anonymous blob access for storage
  */
 
 const STORAGE_ACCOUNT = process.env.REACT_APP_AZURE_STORAGE_ACCOUNT || 'cricktime';
 const CONTAINER_NAME = process.env.REACT_APP_AZURE_CONTAINER || 'backups';
-const TENANT_ID = process.env.REACT_APP_AZURE_TENANT_ID || 'common'; // 'common' for multi-tenant
-const CLIENT_ID = process.env.REACT_APP_AZURE_CLIENT_ID || '4cb6959c-34a4-4715-9b75-6f39042c0b44';
+const TENANT_ID = process.env.REACT_APP_AZURE_TENANT_ID || 'consumers';
+const CLIENT_ID = process.env.REACT_APP_AZURE_CLIENT_ID || 'd64bd21a-1627-4ff5-96b7-c1cef325cf5a';
+const SAS_TOKEN = process.env.REACT_APP_AZURE_SAS_TOKEN || '';
 
 class CloudBackupService {
   constructor() {
@@ -20,47 +21,78 @@ class CloudBackupService {
     this.initialized = false;
     this.authenticated = false;
     this.error = null;
+    this.initPromise = null; // Track initialization promise to prevent concurrent calls
+    this.userToken = null; // Store user token for identification
   }
 
   /**
-   * Initialize the Azure Blob Storage client with Entra authentication
+   * Initialize the Azure Blob Storage client
+   * Uses Entra for user identification and anonymous access for storage
    */
   async initialize() {
+    // If already initialized, return immediately
     if (this.initialized && this.authenticated) return true;
+    
+    // If initialization is in progress, wait for it
+    if (this.initPromise) return this.initPromise;
 
+    // Start new initialization
+    this.initPromise = this._doInitialize();
+    const result = await this.initPromise;
+    this.initPromise = null;
+    return result;
+  }
+
+  async _doInitialize() {
     try {
-      console.log('Initializing Azure Blob Storage with Entra authentication...');
+      console.log('Initializing cloud backup...');
       
+      // Step 1: Authenticate user with Entra to get their identity
+      if (!this.credential) {
+        const redirectUri = window.location.hostname === 'localhost' 
+          ? window.location.origin 
+          : window.location.origin + window.location.pathname.replace(/\/$/, '');
+        
+        console.log('Authenticating user for identification...');
+        
+        this.credential = new InteractiveBrowserCredential({
+          tenantId: TENANT_ID,
+          clientId: CLIENT_ID,
+          redirectUri: redirectUri,
+        });
+
+        // Get a token just for user identification (using Microsoft Graph)
+        try {
+          this.userToken = await this.credential.getToken(['User.Read']);
+          console.log('User authenticated successfully');
+        } catch (error) {
+          console.error('Failed to authenticate user:', error);
+          throw new Error('User authentication failed. Please sign in.');
+        }
+      }
+      
+      // Step 2: Connect to blob storage using SAS token
       const accountUrl = `https://${STORAGE_ACCOUNT}.blob.core.windows.net`;
       
-      // Create interactive browser credential for user login
-      this.credential = new InteractiveBrowserCredential({
-        tenantId: TENANT_ID,
-        clientId: CLIENT_ID,
-        redirectUri: window.location.origin + window.location.pathname.replace(/\/$/, ''), // Support GitHub Pages subpath
-        loginHint: '', // Optional: pre-fill user email
-      });
-
-      // Create BlobServiceClient with the credential
-      this.blobServiceClient = new BlobServiceClient(accountUrl, this.credential);
+      // Create BlobServiceClient with SAS token for read/write access
+      const urlWithSAS = SAS_TOKEN ? `${accountUrl}${SAS_TOKEN}` : accountUrl;
+      this.blobServiceClient = new BlobServiceClient(urlWithSAS);
       
       // Get container client
       this.containerClient = this.blobServiceClient.getContainerClient(CONTAINER_NAME);
       
-      // Test authentication by trying to access the container
+      // Test anonymous access by trying to list blobs
       try {
-        await this.containerClient.getProperties();
-        console.log('Successfully authenticated and connected to Azure Blob Storage');
+        // Try a simple operation to verify container is accessible
+        const iter = this.containerClient.listBlobsFlat({ maxPageSize: 1 });
+        await iter.next();
+        console.log('Successfully connected to Azure Blob Storage with SAS token');
         this.authenticated = true;
       } catch (error) {
-        // If container doesn't exist, try to create it
         if (error.statusCode === 404) {
-          console.log('Container not found, attempting to create...');
-          await this.containerClient.create();
-          console.log('Container created successfully');
-          this.authenticated = true;
-        } else if (error.statusCode === 403) {
-          throw new Error('Access denied. Please ensure your Azure account has Storage Blob Data Contributor role on the storage account.');
+          throw new Error('Storage container not found. Please ensure the container exists.');
+        } else if (error.statusCode === 403 || error.statusCode === 401) {
+          throw new Error('Access denied. Please ensure you have a valid SAS token configured in REACT_APP_AZURE_SAS_TOKEN.');
         } else {
           throw error;
         }
@@ -71,9 +103,16 @@ class CloudBackupService {
       return true;
     } catch (error) {
       console.error('Failed to initialize cloud backup:', error);
-      this.error = error.message || 'Authentication failed';
+      this.error = error.message || 'Initialization failed';
       this.initialized = false;
       this.authenticated = false;
+      
+      // Clear credential on auth failure so it can be retried
+      if (error.message?.includes('interaction_in_progress')) {
+        this.credential = null;
+        this.userToken = null;
+      }
+      
       return false;
     }
   }
@@ -82,21 +121,26 @@ class CloudBackupService {
    * Generate a unique backup filename with user identifier
    */
   async generateBackupFilename(userId = null) {
-    // If no userId provided, try to get from authenticated user
-    if (!userId && this.credential) {
+    // If no userId provided, get from authenticated user token
+    if (!userId && this.userToken) {
       try {
-        // Get user info from token
-        const token = await this.credential.getToken(['https://storage.azure.com/.default']);
-        // Parse JWT to get user identifier (will be email or object ID)
-        const payload = JSON.parse(atob(token.token.split('.')[1]));
-        userId = payload.preferred_username || payload.unique_name || payload.oid || 'default';
+        // userToken is an AccessToken object with a 'token' property containing the JWT
+        const tokenString = this.userToken.token;
+        if (tokenString) {
+          const parts = tokenString.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]));
+            userId = payload.preferred_username || payload.email || payload.unique_name || payload.upn || payload.oid || 'default';
+            console.log('Using user ID from token:', userId);
+          }
+        }
       } catch (error) {
         console.warn('Could not get user ID from token, using default', error);
         userId = 'default';
       }
     }
     
-    const sanitizedUserId = (userId || 'default').replace(/[^a-zA-Z0-9-_.]/g, '_');
+    const sanitizedUserId = (userId || 'default').replace(/[^a-zA-Z0-9-_.@]/g, '_');
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     return `${sanitizedUserId}/backup-${timestamp}.json`;
   }
@@ -128,7 +172,7 @@ class CloudBackupService {
           },
           metadata: {
             timestamp: new Date().toISOString(),
-            appVersion: '1.0',
+            appVersion: '1.1.0',
             dataVersion: String(data.schemaVersion || 1)
           }
         }
@@ -196,15 +240,22 @@ class CloudBackupService {
         throw new Error(this.error || 'Cloud backup not initialized');
       }
 
-      // Get current user identifier
+      // Get current user identifier from stored token
       let userId = 'default';
-      try {
-        const token = await this.credential.getToken(['https://storage.azure.com/.default']);
-        const payload = JSON.parse(atob(token.token.split('.')[1]));
-        userId = payload.preferred_username || payload.unique_name || payload.oid || 'default';
-        userId = userId.replace(/[^a-zA-Z0-9-_.]/g, '_');
-      } catch (error) {
-        console.warn('Could not get user ID, listing all backups');
+      if (this.userToken) {
+        try {
+          const tokenString = this.userToken.token;
+          if (tokenString) {
+            const parts = tokenString.split('.');
+            if (parts.length === 3) {
+              const payload = JSON.parse(atob(parts[1]));
+              userId = payload.preferred_username || payload.email || payload.unique_name || payload.upn || payload.oid || 'default';
+              userId = userId.replace(/[^a-zA-Z0-9-_.@]/g, '_');
+            }
+          }
+        } catch (error) {
+          console.warn('Could not get user ID from token', error);
+        }
       }
 
       const backups = [];
@@ -272,13 +323,38 @@ class CloudBackupService {
   }
 
   /**
-   * Sign out the user
+   * Sign out the user and clear all cached authentication
    */
   async signOut() {
     this.authenticated = false;
     this.initialized = false;
     this.credential = null;
+    this.blobServiceClient = null;
+    this.containerClient = null;
+    this.initPromise = null;
+    
+    // Clear MSAL cache from localStorage
+    try {
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith('msal.') || key.includes('login.windows.net') || key.includes('login.microsoftonline.com')) {
+          localStorage.removeItem(key);
+        }
+      });
+      console.log('Cleared MSAL cache from localStorage');
+    } catch (e) {
+      console.warn('Could not clear MSAL cache:', e);
+    }
+    
     console.log('Signed out from Azure');
+  }
+
+  /**
+   * Force a fresh authentication by clearing cache and re-initializing
+   */
+  async forceReauth() {
+    await this.signOut();
+    return await this.initialize();
   }
 }
 
